@@ -1,0 +1,33 @@
+[1.052s] Invoking command in '/home/memin/traffic_sim_ws/build/traffic_simulation': PYTHONPATH=/home/memin/traffic_sim_ws/build/traffic_simulation/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --editable --build-directory /home/memin/traffic_sim_ws/build/traffic_simulation/build --no-deps symlink_data
+[1.364s] running develop
+[1.567s] running egg_info
+[1.567s] creating traffic_simulation.egg-info
+[1.587s] writing traffic_simulation.egg-info/PKG-INFO
+[1.587s] writing dependency_links to traffic_simulation.egg-info/dependency_links.txt
+[1.587s] writing entry points to traffic_simulation.egg-info/entry_points.txt
+[1.587s] writing requirements to traffic_simulation.egg-info/requires.txt
+[1.588s] writing top-level names to traffic_simulation.egg-info/top_level.txt
+[1.588s] writing manifest file 'traffic_simulation.egg-info/SOURCES.txt'
+[1.628s] reading manifest file 'traffic_simulation.egg-info/SOURCES.txt'
+[1.628s] writing manifest file 'traffic_simulation.egg-info/SOURCES.txt'
+[1.649s] running build_ext
+[1.649s] Creating /home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages/traffic-simulation.egg-link (link to .)
+[1.650s] Installing collision_avoidance_node script to /home/memin/traffic_sim_ws/install/traffic_simulation/lib/traffic_simulation
+[1.650s] Installing gui_node script to /home/memin/traffic_sim_ws/install/traffic_simulation/lib/traffic_simulation
+[1.651s] Installing path_follower_node script to /home/memin/traffic_sim_ws/install/traffic_simulation/lib/traffic_simulation
+[1.651s] Installing path_planner_node script to /home/memin/traffic_sim_ws/install/traffic_simulation/lib/traffic_simulation
+[1.651s] Installing route_planner_node script to /home/memin/traffic_sim_ws/install/traffic_simulation/lib/traffic_simulation
+[1.651s] Installing vel_subscriber_node script to /home/memin/traffic_sim_ws/install/traffic_simulation/lib/traffic_simulation
+[1.651s] 
+[1.652s] Installed /home/memin/traffic_sim_ws/build/traffic_simulation
+[1.652s] running symlink_data
+[1.652s] creating /home/memin/traffic_sim_ws/install/traffic_simulation/share/ament_index
+[1.652s] creating /home/memin/traffic_sim_ws/install/traffic_simulation/share/ament_index/resource_index
+[1.652s] creating /home/memin/traffic_sim_ws/install/traffic_simulation/share/ament_index/resource_index/packages
+[1.653s] symbolically linking /home/memin/traffic_sim_ws/build/traffic_simulation/resource/traffic_simulation -> /home/memin/traffic_sim_ws/install/traffic_simulation/share/ament_index/resource_index/packages
+[1.653s] symbolically linking /home/memin/traffic_sim_ws/build/traffic_simulation/package.xml -> /home/memin/traffic_sim_ws/install/traffic_simulation/share/traffic_simulation
+[1.653s] creating /home/memin/traffic_sim_ws/install/traffic_simulation/share/traffic_simulation/config
+[1.654s] symbolically linking /home/memin/traffic_sim_ws/build/traffic_simulation/traffic_simulation/config/default_config.yaml -> /home/memin/traffic_sim_ws/install/traffic_simulation/share/traffic_simulation/config
+[1.654s] creating /home/memin/traffic_sim_ws/install/traffic_simulation/share/traffic_simulation/launch
+[1.655s] symbolically linking /home/memin/traffic_sim_ws/build/traffic_simulation/launch/traffic_sim.launch.py -> /home/memin/traffic_sim_ws/install/traffic_simulation/share/traffic_simulation/launch
+[1.686s] Invoked command in '/home/memin/traffic_sim_ws/build/traffic_simulation' returned '0': PYTHONPATH=/home/memin/traffic_sim_ws/build/traffic_simulation/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --editable --build-directory /home/memin/traffic_sim_ws/build/traffic_simulation/build --no-deps symlink_data

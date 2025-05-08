@@ -1,0 +1,18 @@
+simulation:
+  update_rate: 30  # Hz
+
+visualization:
+  fullscreen: true
+  default_junction_count: 4
+
+path_planning:
+  algorithm: "astar"  # Options: astar, dijkstra
+
+vehicle:
+  default_speed: 0.5
+  max_speed: 2.0
+  angular_speed: 0.8
+
+collision_avoidance:
+  safe_distance: 0.5
+

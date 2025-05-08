@@ -1,0 +1,20 @@
+running develop
+running egg_info
+writing traffic_simulation.egg-info/PKG-INFO
+writing dependency_links to traffic_simulation.egg-info/dependency_links.txt
+writing entry points to traffic_simulation.egg-info/entry_points.txt
+writing requirements to traffic_simulation.egg-info/requires.txt
+writing top-level names to traffic_simulation.egg-info/top_level.txt
+reading manifest file 'traffic_simulation.egg-info/SOURCES.txt'
+writing manifest file 'traffic_simulation.egg-info/SOURCES.txt'
+running build_ext
+Creating /home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages/traffic-simulation.egg-link (link to .)
+Installing collision_avoidance_node script to /home/memin/traffic_sim_ws/install/traffic_simulation/lib/traffic_simulation
+Installing gui_node script to /home/memin/traffic_sim_ws/install/traffic_simulation/lib/traffic_simulation
+Installing path_follower_node script to /home/memin/traffic_sim_ws/install/traffic_simulation/lib/traffic_simulation
+Installing path_planner_node script to /home/memin/traffic_sim_ws/install/traffic_simulation/lib/traffic_simulation
+Installing route_planner_node script to /home/memin/traffic_sim_ws/install/traffic_simulation/lib/traffic_simulation
+Installing vel_subscriber_node script to /home/memin/traffic_sim_ws/install/traffic_simulation/lib/traffic_simulation
+
+Installed /home/memin/traffic_sim_ws/build/traffic_simulation
+running symlink_data

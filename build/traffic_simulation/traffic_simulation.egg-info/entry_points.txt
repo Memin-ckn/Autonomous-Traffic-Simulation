@@ -1,0 +1,7 @@
+[console_scripts]
+collision_avoidance_node = traffic_simulation.control.collision_avoidance:main
+gui_node = traffic_simulation.visualization.gui:main
+path_follower_node = traffic_simulation.control.path_follower:main
+path_planner_node = traffic_simulation.planning.path_planner:main
+route_planner_node = traffic_simulation.planning.route_planner:main
+vel_subscriber_node = traffic_simulation.control.velocity_subscriber:main
