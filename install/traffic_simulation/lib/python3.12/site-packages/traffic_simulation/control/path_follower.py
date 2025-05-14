@@ -23,7 +23,7 @@ class PathFollower(Node):
         self.current_path = [(pose.pose.position.x, pose.pose.position.y) 
                            for pose in msg.poses]
         self.current_goal_index = 0
-        self.get_logger().info(f"Yeni yol alındı: {len(self.current_path)} nokta")
+        self.get_logger().info(f"New path received: {len(self.current_path)} points")
 
     def calculate_velocity(self, current_pose):
         if not self.current_path or self.current_goal_index >= len(self.current_path):
@@ -34,7 +34,7 @@ class PathFollower(Node):
         dy = goal[1] - current_pose.y
         distance = math.sqrt(dx**2 + dy**2)
         
-        if distance < 0.1:  # Hedefe ulaştı
+        if distance < 0.1:  # Reached goal
             self.current_goal_index += 1
             return self.calculate_velocity(current_pose)
         
@@ -44,3 +44,13 @@ class PathFollower(Node):
         twist.angular.z = self.angular_speed * angle_to_goal
         
         return twist
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = PathFollower()
+    rclpy.spin(node)
+    node.destroy_node()
+    rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()

@@ -1,1 +1,0 @@
-/home/memin/traffic_sim_ws/src/traffic_simulation/launch/traffic_sim.launch.py

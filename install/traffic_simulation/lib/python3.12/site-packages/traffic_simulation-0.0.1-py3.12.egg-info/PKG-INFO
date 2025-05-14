@@ -1,7 +1,7 @@
 Metadata-Version: 2.1
 Name: traffic-simulation
 Version: 0.0.1
-Summary: ROS2 traffic simulation with Pygame visualization
-Maintainer: Your Name
-Maintainer-email: your_email@example.com
-License: Apache License 2.0
+Summary: Traffic simulation package
+Maintainer: memin
+Maintainer-email: memin@todo.todo
+License: TODO: License declaration
