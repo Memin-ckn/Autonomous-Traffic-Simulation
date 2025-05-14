@@ -7,6 +7,26 @@ import random
 import rclpy
 from rclpy.node import Node
 
+# Debug import issues
+try:
+    print("Importing vehicle classes...")
+    from traffic_simulation.vehicles.vehicle import Vehicle, WhiteCar, SmartCar
+    print("Importing sensor classes...")
+    from traffic_simulation.sensors.sensor import Lidar, Radar
+    print("Importing communication classes...")
+    from traffic_simulation.communication.iot import IoTCommunicator
+    print("Importing collision avoidance classes...")
+    from traffic_simulation.planning.collision_avoidance import CollisionAvoidance, CollisionStrategy
+    print("All imports successful!")
+except Exception as e:
+    print(f"Import error: {e}")
+    import traceback
+    traceback.print_exc()
+    # Don't crash, but set flags to avoid using these features
+    IMPORT_ERROR = True
+else:
+    IMPORT_ERROR = False
+
 class SimpleVisualizer(Node):
     def __init__(self):
         super().__init__('simple_visualizer')
@@ -33,8 +53,8 @@ class SimpleVisualizer(Node):
         self.dropdown_open = False
         
         # Car count dropdown
-        self.car_counts = [4, 8, 12, 16, 20, 24]
-        self.current_car_count = 8  # Default car count
+        self.car_counts = [1, 2, 3, 4, 5, 6, 7, 8]
+        self.current_car_count = 4  # Default car count
         self.car_dropdown_open = False
         
         # Dropdown dimensions
@@ -45,11 +65,9 @@ class SimpleVisualizer(Node):
         self.CAR_WIDTH = 60
         self.CAR_HEIGHT = 30
         
-        # Main car
-        self.main_car_x = None
-        self.main_car_y = None
-        self.main_car_angle = 0
-        self.main_car_speed = 3
+        # Main car - using SmartCar class
+        self.smart_car = None
+        self.main_car_speed = 3.0
         
         # White cars
         self.white_cars = []
@@ -141,20 +159,37 @@ class SimpleVisualizer(Node):
         cars = []
         for _ in range(count):
             route = self.generate_random_route()
-            car = WhiteCar(route[0][0], route[0][1], route)
+            # Use our WhiteCar class from the vehicles module
+            car = WhiteCar(route[0][0], route[0][1], route, self)
             cars.append(car)
         return cars
     
     def generate_random_route(self):
-        start = random.choice(self.intersections)
-        end = random.choice(self.intersections)
-        while start == end:  # Make sure start and end are different
+        """Generate a valid route along roads for vehicles to follow"""
+        # Try a few times to find valid start/end points with a path
+        for _ in range(10):  # Try up to 10 times
+            start = random.choice(self.intersections)
             end = random.choice(self.intersections)
+            while start == end:  # Make sure start and end are different
+                end = random.choice(self.intersections)
+            
+            path = self.find_path(start, end)
+            if path and len(path) > 1:  # Valid path found
+                return path
         
-        path = self.find_path(start, end)
-        if not path:
-            return [start, end]  # Fallback to direct path
-        return path
+        # If we couldn't find a good path after multiple attempts, 
+        # find any connected points to ensure we stay on roads
+        for start in self.intersections:
+            for road in self.roads:
+                if start in road:
+                    # Find the other end of this road
+                    other_end = road[1] if road[0] == start else road[0]
+                    return [start, other_end]
+        
+        # Fallback to a single point if nothing else works
+        # This will make the car effectively stay in place
+        start = random.choice(self.intersections)
+        return [start, start]
     
     def draw_car(self, x, y, angle, color):
         # Convert angle from degrees to radians
@@ -206,32 +241,27 @@ class SimpleVisualizer(Node):
         pygame.draw.circle(self.screen, self.RED, (int(front_x), int(front_y)), 8)
     
     def update_main_car(self):
-        if self.main_car_x is None or self.main_car_y is None or self.current_target >= len(self.route):
+        if self.smart_car is None or self.current_target >= len(self.route) or not self.route:
             return
         
-        # Get current target
-        target_x, target_y = self.route[self.current_target]
-        
-        # Calculate direction to target
-        dx = target_x - self.main_car_x
-        dy = target_y - self.main_car_y
-        target_angle = math.degrees(math.atan2(dy, dx))
-        
-        # Rotate car towards target (smooth turning)
-        angle_diff = (target_angle - self.main_car_angle + 180) % 360 - 180
-        if abs(angle_diff) > 5:
-            self.main_car_angle += angle_diff * 0.1
-        else:
-            self.main_car_angle = target_angle
-        
-        # Move car forward
-        self.main_car_x += math.cos(math.radians(self.main_car_angle)) * self.main_car_speed
-        self.main_car_y += math.sin(math.radians(self.main_car_angle)) * self.main_car_speed
-        
-        # Check if reached target
-        distance = math.sqrt(dx*dx + dy*dy)
-        if distance < 20:
-            self.current_target += 1
+        try:
+            # If the route changed, update the smart car's route
+            if self.smart_car.route != self.route:
+                self.smart_car.route = self.route.copy()
+                self.smart_car.current_target = self.current_target
+            
+            # Get real vehicle objects for collision detection
+            vehicle_list = [car.vehicle for car in self.white_cars]
+            
+            # Update the smart car with collision avoidance
+            self.smart_car.update(vehicle_list)
+            
+            # Update our target tracking to match the smart car
+            self.current_target = self.smart_car.current_target
+        except Exception as e:
+            print(f"Error updating SmartCar: {e}")
+            import traceback
+            traceback.print_exc()
     
     def draw_scene(self):
         # Clear screen
@@ -268,8 +298,8 @@ class SimpleVisualizer(Node):
             self.draw_car(car.x, car.y, car.angle, self.WHITE)
         
         # Draw main car (purple)
-        if self.main_car_x is not None and self.main_car_y is not None:
-            self.draw_car(self.main_car_x, self.main_car_y, self.main_car_angle, self.PURPLE)
+        if self.smart_car is not None:
+            self.draw_car(self.smart_car.x, self.smart_car.y, self.smart_car.angle, self.PURPLE)
         
         # Draw grid size dropdown menu
         grid_dropdown_rect = pygame.Rect(
@@ -337,17 +367,17 @@ class SimpleVisualizer(Node):
             self.screen.blit(text_surface, (20, 20 + i * 20))
     
     def reset_simulation(self):
-        """Reset the simulation with the current grid size"""
-        # Clear existing data
+        # Reset route data
         self.start_point = None
         self.end_point = None
         self.route = []
-        self.main_car_x = None
-        self.main_car_y = None
         self.current_target = 0
+        self.smart_car = None
         
-        # Regenerate grid and cars
+        # Regenerate the grid
         self.intersections, self.roads = self.generate_grid()
+        
+        # Create new white cars
         self.white_cars = self.create_white_cars()
     
     def update_car_count(self):
@@ -362,30 +392,24 @@ class SimpleVisualizer(Node):
             self.dropdown_width,
             self.dropdown_height
         )
-        
-        # Check for car count dropdown menu clicks
+        if grid_dropdown_rect.collidepoint(pos):
+            self.dropdown_open = not self.dropdown_open
+            self.car_dropdown_open = False  # Close other dropdown
+            return
+            
+        # Check for car count dropdown clicks
         car_dropdown_rect = pygame.Rect(
             int(self.width * 0.05) + self.dropdown_width + 20,
             int(self.height * 0.05),
             self.dropdown_width,
             self.dropdown_height
         )
-        
-        # Handle grid size dropdown toggle click
-        if grid_dropdown_rect.collidepoint(pos):
-            self.dropdown_open = not self.dropdown_open
-            # Close the other dropdown if open
-            self.car_dropdown_open = False
-            return
-        
-        # Handle car count dropdown toggle click
         if car_dropdown_rect.collidepoint(pos):
             self.car_dropdown_open = not self.car_dropdown_open
-            # Close the other dropdown if open
-            self.dropdown_open = False
+            self.dropdown_open = False  # Close other dropdown
             return
-        
-        # Handle grid size dropdown option clicks
+            
+        # If grid size dropdown is open
         if self.dropdown_open:
             for i, size in enumerate(self.grid_sizes):
                 option_rect = pygame.Rect(
@@ -395,16 +419,14 @@ class SimpleVisualizer(Node):
                     self.dropdown_height
                 )
                 if option_rect.collidepoint(pos):
-                    self.current_grid_size = size
+                    if size != self.current_grid_size:
+                        self.current_grid_size = size
+                        # Regenerate grid and reset simulation
+                        self.reset_simulation()
                     self.dropdown_open = False
-                    self.reset_simulation()
                     return
-            
-            # Click outside dropdown options, close dropdown
-            self.dropdown_open = False
-            return
         
-        # Handle car count dropdown option clicks
+        # If car count dropdown is open
         if self.car_dropdown_open:
             for i, count in enumerate(self.car_counts):
                 option_rect = pygame.Rect(
@@ -414,30 +436,45 @@ class SimpleVisualizer(Node):
                     self.dropdown_height
                 )
                 if option_rect.collidepoint(pos):
-                    self.current_car_count = count
+                    if count != self.current_car_count:
+                        self.current_car_count = count
+                        self.update_car_count()
                     self.car_dropdown_open = False
-                    self.update_car_count()
                     return
-            
-            # Click outside dropdown options, close dropdown
-            self.car_dropdown_open = False
-            return
         
-        # Check if clicked near an intersection
+        # Check for intersection clicks
         for intersection in self.intersections:
+            # Distance to intersection
             dx = pos[0] - intersection[0]
             dy = pos[1] - intersection[1]
             distance = math.sqrt(dx*dx + dy*dy)
             
-            if distance < 25:
-                if not self.start_point:
+            # If clicked on an intersection
+            if distance < 15:
+                # If no start point, set as start
+                if self.start_point is None:
                     # Set start point
                     self.start_point = intersection
-                    self.main_car_x, self.main_car_y = intersection
-                    self.main_car_angle = 0
+                    try:
+                        # Create the smart car at the start point
+                        print(f"Creating SmartCar at {intersection[0]}, {intersection[1]}")
+                        self.smart_car = SmartCar(intersection[0], intersection[1], [], self)
+                        print("Setting map data...")
+                        self.smart_car.set_map_data(self.intersections, self.roads)
+                        print("SmartCar created successfully")
+                    except Exception as e:
+                        print(f"Error creating SmartCar: {e}")
+                        import traceback
+                        traceback.print_exc()
+                        # Create a backup simple car
+                        if IMPORT_ERROR:
+                            self.smart_car = None
                     self.current_target = 0
                     self.route = []
-                elif not self.end_point:
+                    return
+                    
+                # If start point exists but no end point
+                elif self.end_point is None and intersection != self.start_point:
                     # Set end point
                     self.end_point = intersection
                     
@@ -445,103 +482,157 @@ class SimpleVisualizer(Node):
                     path = self.find_path(self.start_point, self.end_point)
                     if path:
                         self.route = path
-                        self.current_target = 1  # Skip the start point
+                        self.current_target = 1  # Skip start point
+                        # Update the smart car's route
+                        self.smart_car.route = path
+                        self.smart_car.current_target = 1
                     else:
-                        # No path found, just go directly
-                        self.route = [self.start_point, self.end_point]
-                        self.current_target = 1
+                        # No path found, reset
+                        self.start_point = intersection
+                        self.end_point = None
+                        try:
+                            # Create a new smart car at this location
+                            print(f"Creating SmartCar at {intersection[0]}, {intersection[1]} (path not found)")
+                            self.smart_car = SmartCar(intersection[0], intersection[1], [], self)
+                            print("Setting map data...")
+                            self.smart_car.set_map_data(self.intersections, self.roads)
+                            print("SmartCar created successfully")
+                        except Exception as e:
+                            print(f"Error creating SmartCar: {e}")
+                            import traceback
+                            traceback.print_exc()
+                            # Create a backup simple car
+                            if IMPORT_ERROR:
+                                self.smart_car = None
+                        self.current_target = 0
+                        self.route = []
+                    return
+                    
+                # If both start and end exist, reset and set as new start
                 else:
-                    # Reset
                     self.start_point = intersection
                     self.end_point = None
-                    self.main_car_x, self.main_car_y = intersection
-                    self.main_car_angle = 0
+                    try:
+                        # Create a new smart car at this location
+                        print(f"Creating SmartCar at {intersection[0]}, {intersection[1]} (reset)")
+                        self.smart_car = SmartCar(intersection[0], intersection[1], [], self)
+                        print("Setting map data...")
+                        self.smart_car.set_map_data(self.intersections, self.roads)
+                        print("SmartCar created successfully")
+                    except Exception as e:
+                        print(f"Error creating SmartCar: {e}")
+                        import traceback
+                        traceback.print_exc()
+                        # Create a backup simple car
+                        if IMPORT_ERROR:
+                            self.smart_car = None
                     self.current_target = 0
                     self.route = []
-                break
+                    return
     
     def run(self):
         running = True
         
-        while running:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    running = False
-                elif event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_ESCAPE:
+        try:
+            while running:
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
                         running = False
-                elif event.type == pygame.MOUSEBUTTONDOWN:
-                    self.handle_click(pygame.mouse.get_pos())
-            
-            # Update main car position
-            self.update_main_car()
-            
-            # Update white cars
-            for car in self.white_cars:
-                car.update()
-            
-            # Draw everything
-            self.draw_scene()
-            
-            # Update the display
-            pygame.display.flip()
-            self.clock.tick(60)
+                    elif event.type == pygame.KEYDOWN:
+                        if event.key == pygame.K_ESCAPE:
+                            running = False
+                    elif event.type == pygame.MOUSEBUTTONDOWN:
+                        self.handle_click(pygame.mouse.get_pos())
+                
+                # Update main car position
+                self.update_main_car()
+                
+                # Update white cars
+                for car in self.white_cars:
+                    car.update()
+                
+                # Draw everything
+                self.draw_scene()
+                
+                # Update the display
+                pygame.display.flip()
+                self.clock.tick(60)
+        except Exception as e:
+            self.get_logger().error(f"Error in visualization: {e}")
+            import traceback
+            self.get_logger().error(traceback.format_exc())
 
 
 class WhiteCar:
-    def __init__(self, x, y, route):
+    """
+    Compatibility wrapper for the WhiteCar class in the vehicle module
+    """
+    def __init__(self, x, y, route, node=None):
+        # Create the actual vehicle object from our module
+        from traffic_simulation.vehicles.vehicle import WhiteCar as RealWhiteCar
+        self.vehicle = RealWhiteCar(x, y, route, node)
         self.x = x
         self.y = y
         self.angle = 0
-        self.speed = random.uniform(1.0, 2.5)
         self.route = route
-        self.current_target = 1  # Skip start point
-        
+        self.current_target = 1
+        self.width = 60
+        self.height = 30
+        self.node = node  # Store reference to visualizer
+    
     def update(self):
-        # Check if reached end of route
-        if self.current_target >= len(self.route):
-            # Reset to beginning
-            self.current_target = 0
-            return
-        
-        # Get current target
-        target_x, target_y = self.route[self.current_target]
-        
-        # Calculate direction to target
-        dx = target_x - self.x
-        dy = target_y - self.y
-        target_angle = math.degrees(math.atan2(dy, dx))
-        
-        # Rotate car towards target (smooth turning)
-        angle_diff = (target_angle - self.angle + 180) % 360 - 180
-        if abs(angle_diff) > 5:
-            self.angle += angle_diff * 0.1
-        else:
-            self.angle = target_angle
-        
-        # Move car forward
-        self.x += math.cos(math.radians(self.angle)) * self.speed
-        self.y += math.sin(math.radians(self.angle)) * self.speed
-        
-        # Check if reached target
-        distance = math.sqrt(dx*dx + dy*dy)
-        if distance < 20:
-            self.current_target += 1
+        try:
+            # Update the actual vehicle with the current list of cars
+            self.vehicle.update([])
+            
+            # Update the local attributes for visualization
+            self.x = self.vehicle.x
+            self.y = self.vehicle.y
+            self.angle = self.vehicle.angle
+            self.current_target = self.vehicle.current_target
+            
+            # Check if the car has finished its route and needs a new one
+            if self.current_target >= len(self.route) and self.node:
+                # Generate a new route for continuous movement
+                self.route = self.node.generate_random_route()
+                self.vehicle.route = self.route
+                self.vehicle.current_target = 1  # Skip the start point
+                self.current_target = 1
+        except Exception as e:
+            print(f"Error updating WhiteCar: {e}")
 
 
 def main(args=None):
-    rclpy.init(args=args)
-    
     try:
+        print("Initializing ROS2...")
+        rclpy.init(args=args)
+        
+        print("Creating SimpleVisualizer node...")
         node = SimpleVisualizer()
+        
+        print("Starting SimpleVisualizer run loop...")
         node.run()
+        
+        print("SimpleVisualizer run completed normally")
+    
     except KeyboardInterrupt:
-        pass
+        print("Keyboard interrupt received, shutting down")
+    
+    except Exception as e:
+        print(f"Error in main: {e}")
+        import traceback
+        traceback.print_exc()
+    
     finally:
-        if 'node' in locals():
-            node.destroy_node()
-        rclpy.shutdown()
-        pygame.quit()
+        print("Cleaning up...")
+        try:
+            if 'node' in locals():
+                node.destroy_node()
+            rclpy.shutdown()
+            pygame.quit()
+            print("Cleanup complete")
+        except Exception as e:
+            print(f"Error during cleanup: {e}")
 
 
 if __name__ == '__main__':

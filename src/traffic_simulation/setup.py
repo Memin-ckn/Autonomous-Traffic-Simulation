@@ -12,7 +12,11 @@ setup(
               f'{package_name}.planning',
               f'{package_name}.control',
               f'{package_name}.utils',
-              f'{package_name}.config'],
+              f'{package_name}.config',
+              f'{package_name}.sensors',
+              f'{package_name}.communication',
+              f'{package_name}.vehicles',
+              'tests'],
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
