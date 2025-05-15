@@ -572,6 +572,7 @@ class SimpleVisualizer(Node):
         instructions = [
             "Traffic Simulator - Simple Visualizer",
             "Click red intersection to set start, blue for end",
+            "Press 'S' to randomly select start and end points",
             "Click dropdowns to change grid size and car count",
             "Press 'H' to toggle hitboxes for collision detection",
             "Press 'R' to force the purple car to find an alternative route",
@@ -813,6 +814,10 @@ class SimpleVisualizer(Node):
                                                 self.current_target = 1
                                                 # Set the strategy to REROUTE 
                                                 self.smart_car.current_strategy = CollisionStrategy.REROUTE
+                        elif event.key == pygame.K_s:
+                            # Random start and finish
+                            print("Generating random start and finish points...")
+                            self.random_start_finish()
                     elif event.type == pygame.MOUSEBUTTONDOWN:
                         self.handle_click(pygame.mouse.get_pos())
                 
@@ -1130,6 +1135,57 @@ class SimpleVisualizer(Node):
                     queue.append((neighbor, path + [neighbor]))
         
         return None  # No path found
+
+    def random_start_finish(self):
+        """Randomly select start and finish points and generate a route"""
+        if not self.intersections or len(self.intersections) < 2:
+            print("Not enough intersections to create a random route")
+            return False
+            
+        # Clear existing route
+        self.start_point = None
+        self.end_point = None
+        self.route = []
+        self.current_target = 0
+        
+        # Select random start point
+        self.start_point = random.choice(self.intersections)
+        
+        # Select random end point (different from start)
+        available_ends = [p for p in self.intersections if p != self.start_point]
+        if not available_ends:
+            print("No valid end points available")
+            return False
+            
+        self.end_point = random.choice(available_ends)
+        
+        print(f"Selected random start: {self.start_point}, end: {self.end_point}")
+        
+        # Create the smart car at the start point
+        try:
+            self.smart_car = SmartCar(self.start_point[0], self.start_point[1], [], self)
+            self.smart_car.set_map_data(self.intersections, self.roads)
+            
+            # Find path between points
+            path = self.find_path(self.start_point, self.end_point)
+            if path:
+                self.route = path
+                self.current_target = 1  # Skip start point
+                # Update the smart car's route
+                self.smart_car.route = path
+                self.smart_car.original_route = path.copy()
+                self.smart_car.current_target = 1
+                print(f"Found valid route with {len(path)} points")
+                return True
+            else:
+                print("No valid path found between random points")
+                return False
+                
+        except Exception as e:
+            print(f"Error creating SmartCar with random route: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
 
 
 class WhiteCar:
