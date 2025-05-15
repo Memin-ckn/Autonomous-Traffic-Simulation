@@ -110,6 +110,62 @@ class WhiteCar(Vehicle):
         self.speed = random.uniform(1.0, 2.5)
         self.default_speed = self.speed
         self.vehicle_type = "regular"
+        self.intersections = []
+        self.roads = []
+        
+    def set_map_data(self, intersections: List[Tuple[float, float]], 
+                    roads: List[Tuple[Tuple[float, float], Tuple[float, float]]]):
+        """Set map data for route validation"""
+        self.intersections = intersections
+        self.roads = roads
+        
+    def has_road_between(self, point1, point2):
+        """Check if there's a direct road between two points"""
+        if not self.roads:
+            return True  # If no roads are specified, assume all connections are valid
+        return (point1, point2) in self.roads or (point2, point1) in self.roads
+        
+    def validate_route(self):
+        """Validate that the route follows only valid roads"""
+        if not self.roads or len(self.route) < 2:
+            return True
+            
+        # Check each segment
+        for i in range(len(self.route) - 1):
+            if not self.has_road_between(self.route[i], self.route[i+1]):
+                print(f"Invalid route segment in WhiteCar: {self.route[i]} to {self.route[i+1]}")
+                return False
+        return True
+    
+    def update(self, all_vehicles: List["Vehicle"] = None):
+        """Update vehicle with route validation"""
+        # Check if we have valid route
+        if self.intersections and self.roads and not self.validate_route():
+            # Find an intersection near current position
+            closest_intersection = None
+            closest_dist = float('inf')
+            
+            for intersection in self.intersections:
+                dx = self.x - intersection[0]
+                dy = self.y - intersection[1]
+                dist = math.sqrt(dx*dx + dy*dy)
+                
+                if dist < closest_dist:
+                    closest_dist = dist
+                    closest_intersection = intersection
+            
+            # Find another connected intersection
+            for road in self.roads:
+                if closest_intersection in road:
+                    # Get the other endpoint
+                    other_end = road[1] if road[0] == closest_intersection else road[0]
+                    # Set a new valid route
+                    self.route = [closest_intersection, other_end]
+                    self.current_target = 1
+                    break
+        
+        # Regular update
+        super().update(all_vehicles)
 
 
 class SmartCar(Vehicle):
