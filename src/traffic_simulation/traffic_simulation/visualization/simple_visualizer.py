@@ -97,6 +97,22 @@ class SimpleVisualizer(Node):
         # Debug options
         self.show_hitboxes = False  # Toggle with 'H' key
         
+        # Detection and avoidance parameters
+        self.detection_range = self.ROAD_WIDTH * 10  # Larger detection zone
+        self.safety_zone_size = 1.5  # Multiplier for safety zone
+        self.detection_zone_size = 3.5  # Increased size for detection zone 
+        
+        # Movement smoothing parameters
+        self.acceleration_rate = 0.05  # How quickly cars accelerate
+        self.deceleration_rate = 0.08  # How quickly cars decelerate
+        self.min_speed = 0.1  # Minimum speed when slowing down
+        
+        # Route planning parameters
+        self.route_check_interval = 30  # Check route every 30 frames (about once per second)
+        self.preventative_reroute = True  # Enable preventative rerouting
+        self.route_safety_threshold = 50  # Minimum safety score to avoid rerouting
+        self.route_check_count = 0  # Counter for checking route
+        
         # Generate the map
         self.intersections, self.roads = self.generate_grid()
         
@@ -352,15 +368,56 @@ class SimpleVisualizer(Node):
             # Get real vehicle objects for sensor detection
             vehicle_list = [car.vehicle for car in self.white_cars]
             
-            # Check for collisions with white cars before moving
+            # Periodically check if we need preventative rerouting (like a flu shot)
+            self.route_check_count += 1
+            if self.preventative_reroute and self.route_check_count >= self.route_check_interval:
+                self.route_check_count = 0
+                is_rerouted = self.preventative_reroute()
+                if is_rerouted:
+                    # If we've already rerouted preventatively, skip the rest to avoid double-handling
+                    # Update our target tracking to match the smart car
+                    self.current_target = self.smart_car.current_target
+                    return
+            
+            # Reactively check for imminent collisions (treatment, not prevention)
+            # This handles cases where preventative measures failed or weren't enough
             collisions, predicted_collisions = self.check_all_collisions()
             
             if collisions:
-                print(f"Immediate collision detected with {len(collisions)} cars!")
+                print(f"EMERGENCY: Immediate collision detected with {len(collisions)} cars!")
             
             if predicted_collisions:
-                for _, _, time in predicted_collisions:
-                    print(f"Collision predicted in {time} steps")
+                closest_collision = min(predicted_collisions, key=lambda x: x[2])
+                _, _, time = closest_collision
+                print(f"WARNING: Collision predicted in {time} steps - immediate action needed")
+            
+            # Store current target speed for smooth adjustment
+            target_speed = self.smart_car.default_speed
+            
+            # Adjust target speed based on collision status
+            if self.smart_car.collision_risk:
+                if self.smart_car.current_strategy == CollisionStrategy.YIELD:
+                    # Complete stop only for emergency situations
+                    target_speed = 0
+                elif self.smart_car.current_strategy == CollisionStrategy.SLOW_DOWN:
+                    # Calculate a target speed based on time to collision or other factors
+                    if predicted_collisions:
+                        closest_collision = min(predicted_collisions, key=lambda x: x[2])
+                        _, _, time_to_collision = closest_collision
+                        # The closer the collision, the slower we go
+                        slowdown_factor = max(0.1, time_to_collision / 8.0)
+                        target_speed = self.smart_car.default_speed * slowdown_factor
+            
+            # Smoothly adjust the actual speed toward the target speed
+            if self.smart_car.speed < target_speed:
+                # Accelerate gradually
+                self.smart_car.speed = min(self.smart_car.speed + self.acceleration_rate, target_speed)
+            elif self.smart_car.speed > target_speed:
+                # Decelerate gradually
+                self.smart_car.speed = max(self.smart_car.speed - self.deceleration_rate, target_speed)
+                # Ensure we don't go below minimum speed unless target is 0
+                if target_speed > 0:
+                    self.smart_car.speed = max(self.smart_car.speed, self.min_speed)
             
             # Only update if no immediate collisions or if we're rerouting/yielding
             if not collisions or self.smart_car.current_strategy in [CollisionStrategy.REROUTE, CollisionStrategy.YIELD]:
@@ -387,7 +444,7 @@ class SimpleVisualizer(Node):
                         closest_collision = min(predicted_collisions, key=lambda x: x[2])
                         _, obstacle_car, _ = closest_collision
                         
-                        # Try to reroute
+                        # Try to reroute - this is now reactive (like medicine after getting sick)
                         self.initiate_reroute(self.smart_car, obstacle_car)
                 
         except Exception as e:
@@ -453,9 +510,19 @@ class SimpleVisualizer(Node):
                                         (midpoint[0]-size, midpoint[1]+size),
                                         (midpoint[0]+size, midpoint[1]-size), 5)
         
-        # Draw white cars
+        # Draw white cars - now with "ghost" visualization
         for car in self.white_cars:
+            # Draw ghost danger zone (only when hitboxes are shown)
+            if hasattr(self, 'show_hitboxes') and self.show_hitboxes:
+                # Draw a semi-transparent danger zone around ghosts
+                danger_radius = self.ROAD_WIDTH * 5
+                ghost_surface = pygame.Surface((danger_radius*2, danger_radius*2), pygame.SRCALPHA)
+                pygame.draw.circle(ghost_surface, (255, 0, 0, 40), (danger_radius, danger_radius), danger_radius)
+                self.screen.blit(ghost_surface, (car.x - danger_radius, car.y - danger_radius))
+            
+            # Draw the white car
             self.draw_car(car.x, car.y, car.angle, self.WHITE)
+            
             # Draw hitbox for debugging
             if hasattr(self, 'show_hitboxes') and self.show_hitboxes:
                 corners = self.get_car_corners(car.x, car.y, car.angle)
@@ -463,16 +530,16 @@ class SimpleVisualizer(Node):
                 
                 # Draw safety zone around white cars (slightly larger hitbox)
                 if self.show_hitboxes and self.smart_car is not None:
-                    safety_corners = self.get_car_corners(car.x, car.y, car.angle, safety_margin=1.3)
+                    safety_corners = self.get_car_corners(car.x, car.y, car.angle, safety_margin=self.safety_zone_size)
                     pygame.draw.lines(self.screen, (255, 100, 0), True, safety_corners, 1)
         
-        # Draw main car (purple)
+        # Draw main car (purple) - now with Pacman-like features
         if self.smart_car is not None:
             collision_color = self.PURPLE
             
             # Change car color based on collision status and strategy
             if hasattr(self.smart_car, 'collision_risk') and self.smart_car.collision_risk:
-                # Red tint for collision risk
+                # Red tint for collision risk - "powered-up Pacman" look
                 collision_color = (255, 50, 255)  # Brighter purple
                 
                 # Draw collision avoidance indicator
@@ -511,9 +578,14 @@ class SimpleVisualizer(Node):
                 hitbox_color = (255, 0, 0) if hasattr(self.smart_car, 'collision_risk') and self.smart_car.collision_risk else (255, 165, 0)
                 pygame.draw.lines(self.screen, hitbox_color, True, corners, 2)
                 
-                # Draw detection zone (larger hitbox representing sensor range)
-                detection_corners = self.get_car_corners(self.smart_car.x, self.smart_car.y, self.smart_car.angle, safety_margin=2.0)
+                # Draw detection zone (larger hitbox representing sensor range - now much bigger)
+                detection_corners = self.get_car_corners(self.smart_car.x, self.smart_car.y, self.smart_car.angle, safety_margin=self.detection_zone_size)
                 pygame.draw.lines(self.screen, (100, 100, 255), True, detection_corners, 1)
+                
+                # Add expanded blue detection circle
+                detection_surface = pygame.Surface((self.detection_range*2, self.detection_range*2), pygame.SRCALPHA)
+                pygame.draw.circle(detection_surface, (0, 0, 255, 20), (self.detection_range, self.detection_range), self.detection_range)
+                self.screen.blit(detection_surface, (self.smart_car.x - self.detection_range, self.smart_car.y - self.detection_range))
         
         # Draw grid size dropdown menu
         grid_dropdown_rect = pygame.Rect(
@@ -573,10 +645,11 @@ class SimpleVisualizer(Node):
             "Traffic Simulator - Simple Visualizer",
             "Click red intersection to set start, blue for end",
             "Press 'S' to randomly select start and end points",
+            "Press 'P' to check route and preventatively reroute",
             "Click dropdowns to change grid size and car count",
             "Press 'H' to toggle hitboxes for collision detection",
             "Press 'R' to force the purple car to find an alternative route",
-            "Purple car will auto-avoid collisions using: SLOW/STOP/REROUTE",
+            "Purple car avoids white cars proactively (like a flu shot)",
             "ESC to exit"
         ]
         
@@ -602,6 +675,23 @@ class SimpleVisualizer(Node):
                 
                 status_surface = status_font.render(status_text, True, status_color)
                 self.screen.blit(status_surface, (self.width - status_surface.get_width() - 20, 20))
+                
+        # Display route safety score
+        if self.route and self.smart_car:
+            _, _, safety_score = self.check_route_for_conflicts()
+            safety_font = pygame.font.SysFont('Arial', 18, bold=True)
+            
+            # Set color based on safety score
+            if safety_score >= 80:
+                safety_color = (0, 200, 0)  # Green for safe
+            elif safety_score >= 50:
+                safety_color = (255, 165, 0)  # Orange for caution
+            else:
+                safety_color = (255, 0, 0)  # Red for dangerous
+                
+            safety_text = f"Route Safety: {safety_score:.1f}/100"
+            safety_surface = safety_font.render(safety_text, True, safety_color)
+            self.screen.blit(safety_surface, (self.width - safety_surface.get_width() - 20, 50))
     
     def reset_simulation(self):
         # Reset route data
@@ -782,10 +872,11 @@ class SimpleVisualizer(Node):
                         elif event.key == pygame.K_h:
                             # Toggle hitbox display
                             self.show_hitboxes = not self.show_hitboxes
+                            print(f"Hitboxes {'on' if self.show_hitboxes else 'off'} - showing {'ghost danger zones' if self.show_hitboxes else 'normal view'}")
                         elif event.key == pygame.K_r:
                             # Force purple car to reroute (for testing)
                             if self.smart_car and self.route and len(self.route) > 1:
-                                print("Forcing reroute!")
+                                print("Forcing ghost-aware reroute!")
                                 current_pos = (self.smart_car.x, self.smart_car.y)
                                 end_point = self.route[-1]
                                 
@@ -799,24 +890,30 @@ class SimpleVisualizer(Node):
                                         start_intersection = self._find_nearest_intersection(current_pos)
                                         
                                         if start_intersection:
-                                            # Find new route avoiding the next waypoint
-                                            new_route = self.find_path_avoiding_node(
+                                            # Use ghost-aware pathfinding
+                                            new_route = self.find_path_avoiding_ghosts(
                                                 start_intersection, 
                                                 end_point, 
                                                 avoid_point
                                             )
                                             
                                             if new_route and len(new_route) > 1:
-                                                print(f"Rerouted with {len(new_route)} points, avoiding {avoid_point}")
+                                                safety = self.calculate_path_safety(new_route)
+                                                print(f"Rerouted with {len(new_route)} points, safety: {safety}/100")
                                                 self.smart_car.route = [current_pos] + new_route
                                                 self.smart_car.current_target = 1
                                                 self.route = self.smart_car.route
                                                 self.current_target = 1
                                                 # Set the strategy to REROUTE 
                                                 self.smart_car.current_strategy = CollisionStrategy.REROUTE
+                        elif event.key == pygame.K_p:
+                            # Force preventative reroute check (for testing)
+                            if self.smart_car and self.route and len(self.route) > 1:
+                                print("Checking route safety and rerouting if needed...")
+                                self.preventative_reroute()
                         elif event.key == pygame.K_s:
-                            # Random start and finish
-                            print("Generating random start and finish points...")
+                            # Random start and finish with ghost-aware routing
+                            print("Generating random start and finish points with ghost avoidance...")
                             self.random_start_finish()
                     elif event.type == pygame.MOUSEBUTTONDOWN:
                         self.handle_click(pygame.mouse.get_pos())
@@ -897,7 +994,44 @@ class SimpleVisualizer(Node):
         return rotated_corners
     
     def check_collision(self, car1, car2):
-        """Check if two cars are colliding using Separating Axis Theorem (SAT)"""
+        """
+        Check if two cars are colliding using Separating Axis Theorem (SAT)
+        Now considers traffic lanes based on direction of travel
+        """
+        # First, check if cars are traveling in significantly different directions
+        # If so, we can assume they're in different lanes and won't collide
+        if hasattr(car1, 'angle') and hasattr(car2, 'angle'):
+            angle_diff = abs((car1.angle - car2.angle + 180) % 360 - 180)
+            
+            # If cars are moving nearly perpendicular (75-105 degrees) 
+            # or opposite (165-195 degrees), consider them in different lanes
+            if (75 < angle_diff < 105) or angle_diff > 165:
+                # Cars in perpendicular or opposite directions - assume different lanes
+                # But still check if they're very close (crossing an intersection)
+                dx = car1.x - car2.x
+                dy = car1.y - car2.y
+                distance = math.sqrt(dx*dx + dy*dy)
+                
+                # Only ignore lane-based pass-through if they're not very close
+                if distance > self.CAR_WIDTH * 1.5:
+                    return False
+                
+                # If they're at an intersection, direction doesn't save them
+                # Check if they're near any intersection
+                for intersection in self.intersections:
+                    int_dx = car1.x - intersection[0]
+                    int_dy = car1.y - intersection[1]
+                    int_distance = math.sqrt(int_dx*int_dx + int_dy*int_dy)
+                    
+                    if int_distance < self.ROAD_WIDTH * 1.5:
+                        # They're at an intersection, so lane rules don't apply
+                        # Continue with normal collision detection
+                        break
+                else:
+                    # Not at intersection and moving in different directions
+                    # Assume they're in different lanes and won't collide
+                    return False
+        
         # Get corners of both cars
         corners1 = self.get_car_corners(car1.x, car1.y, car1.angle)
         corners2 = self.get_car_corners(car2.x, car2.y, car2.angle)
@@ -944,8 +1078,8 @@ class SimpleVisualizer(Node):
         
         # No separating axis found, collision detected
         return True
-    
-    def predict_collision(self, car1, car2, time_steps=10):
+
+    def predict_collision(self, car1, car2, time_steps=15):  # Increased from 10 to 15 for longer prediction
         """
         Predict if two cars will collide within the next few time steps
         Returns: 
@@ -990,6 +1124,35 @@ class SimpleVisualizer(Node):
         
         return False, -1
     
+    def calculate_path_safety(self, path):
+        """
+        Calculate how safe a path is based on proximity to white cars
+        Returns a safety score (higher is better)
+        """
+        if not path or len(path) < 2:
+            return 0
+            
+        safety_score = 100  # Start with perfect score
+        
+        # Penalize for each white car near the path
+        for point in path:
+            for car in self.white_cars:
+                dx = point[0] - car.x
+                dy = point[1] - car.y
+                distance = math.sqrt(dx*dx + dy*dy)
+                
+                # Cars very close to path points are a big penalty
+                if distance < self.ROAD_WIDTH * 2:
+                    safety_score -= 20
+                # Cars somewhat close are a moderate penalty    
+                elif distance < self.ROAD_WIDTH * 4:
+                    safety_score -= 10
+                # Cars in the general vicinity are a small penalty
+                elif distance < self.ROAD_WIDTH * 6:
+                    safety_score -= 5
+                    
+        return max(0, safety_score)  # Don't go below 0
+    
     def check_all_collisions(self):
         """Check for collisions between the purple car and white cars, including predicted collisions"""
         collisions = []
@@ -1004,37 +1167,157 @@ class SimpleVisualizer(Node):
                     
                     # Set collision risk flag
                     self.smart_car.collision_risk = True
-                    # Emergency stop for immediate collisions
-                    self.smart_car.speed = 0
+                    # Emergency stop will be handled by gradual deceleration
                     self.smart_car.current_strategy = CollisionStrategy.YIELD
                 
                 # Check for predicted collisions
                 else:
-                    will_collide, time_to_collision = self.predict_collision(self.smart_car, car)
-                    if will_collide:
-                        predicted_collisions.append((self.smart_car, car, time_to_collision))
-                        
-                        # Set appropriate strategy based on time to collision
-                        self.smart_car.collision_risk = True
-                        
-                        # Very close collision - slow down significantly or stop
-                        if time_to_collision <= 3:
-                            self.smart_car.current_strategy = CollisionStrategy.SLOW_DOWN
-                            # Slow down more for closer collisions
-                            slowdown_factor = max(0.1, time_to_collision / 5.0)
-                            self.smart_car.speed = self.smart_car.default_speed * slowdown_factor
+                    # Check if car is within detection range (bigger blue area)
+                    dx = car.x - self.smart_car.x
+                    dy = car.y - self.smart_car.y
+                    distance = math.sqrt(dx*dx + dy*dy)
+                    
+                    # Only consider cars within the expanded detection range
+                    if distance <= self.detection_range:
+                        will_collide, time_to_collision = self.predict_collision(self.smart_car, car)
+                        if will_collide:
+                            predicted_collisions.append((self.smart_car, car, time_to_collision))
                             
-                        # Further collision - try to reroute
-                        elif time_to_collision <= 7:
-                            # Only reroute if we weren't already doing so
-                            if self.smart_car.current_strategy != CollisionStrategy.REROUTE:
-                                # Trigger rerouting logic
-                                self.initiate_reroute(self.smart_car, car)
+                            # Set appropriate strategy based on time to collision
+                            self.smart_car.collision_risk = True
+                            
+                            # Very close collision - slow down significantly
+                            if time_to_collision <= 5:  # Increased from 3 to 5 for earlier reaction
+                                self.smart_car.current_strategy = CollisionStrategy.SLOW_DOWN
+                                
+                            # Further collision - try to reroute
+                            elif time_to_collision <= 10:  # Increased from 7 to 10 for earlier rerouting
+                                # Only reroute if we weren't already doing so
+                                if self.smart_car.current_strategy != CollisionStrategy.REROUTE:
+                                    # Trigger rerouting logic
+                                    self.initiate_reroute(self.smart_car, car)
         
         return collisions, predicted_collisions
     
+    def find_path_avoiding_ghosts(self, start, end, avoid_node=None):
+        """
+        Find a path that avoids white cars (like Pacman avoiding ghosts)
+        Uses A* search algorithm with penalties for paths near white cars
+        """
+        if start == end:
+            return [start]
+            
+        # Build an adjacency list based on actual roads
+        adjacency = {}
+        for point in self.intersections:
+            if point != avoid_node:  # Don't include the node to avoid if specified
+                adjacency[point] = []
+            
+        # Add connected points based on actual roads
+        for road in self.roads:
+            a, b = road
+            # Skip roads with avoid_node if specified
+            if avoid_node and (avoid_node == a or avoid_node == b):
+                continue
+                
+            # Add both directions
+            if a in adjacency:
+                adjacency[a].append(b)
+            if b in adjacency:
+                adjacency[b].append(a)
+        
+        # Check if either start or end is not in adjacency list
+        if start not in adjacency or end not in adjacency:
+            return None  # No path possible
+            
+        # Get positions of all white cars
+        ghost_positions = [(car.x, car.y) for car in self.white_cars]
+        
+        # A* algorithm with ghost avoidance
+        open_set = {start}
+        closed_set = set()
+        
+        # Heuristic function - distance to goal plus ghost avoidance
+        def heuristic(node, goal, ghosts):
+            # Base distance to goal
+            dx = node[0] - goal[0]
+            dy = node[1] - goal[1]
+            base_cost = math.sqrt(dx*dx + dy*dy)
+            
+            # Add ghost avoidance cost
+            ghost_cost = 0
+            for ghost_x, ghost_y in ghosts:
+                # Calculate distance to ghost
+                g_dx = node[0] - ghost_x
+                g_dy = node[1] - ghost_y
+                distance = math.sqrt(g_dx*g_dx + g_dy*g_dy)
+                
+                # If too close to ghost, add penalty
+                if distance < self.ROAD_WIDTH * 5:
+                    # The closer the ghost, the higher the penalty
+                    ghost_cost += (self.ROAD_WIDTH * 5 - distance) * 2
+                    
+            return base_cost + ghost_cost
+        
+        # Costs and paths
+        g_score = {start: 0}  # Cost from start to node
+        f_score = {start: heuristic(start, end, ghost_positions)}  # Estimated total cost
+        came_from = {}  # Parent nodes
+        
+        while open_set:
+            # Find node with lowest f_score
+            current = min(open_set, key=lambda node: f_score.get(node, float('inf')))
+            
+            # Check if we've reached the goal
+            if current == end:
+                # Reconstruct path
+                path = [current]
+                while current in came_from:
+                    current = came_from[current]
+                    path.append(current)
+                return list(reversed(path))
+                
+            # Move current from open to closed
+            open_set.remove(current)
+            closed_set.add(current)
+            
+            # Explore neighbors
+            for neighbor in adjacency.get(current, []):
+                if neighbor in closed_set:
+                    continue
+                    
+                # Calculate tentative g_score
+                distance = math.sqrt((current[0] - neighbor[0])**2 + (current[1] - neighbor[1])**2)
+                tentative_g = g_score[current] + distance
+                
+                # Extra cost for neighbors near ghosts
+                for ghost_x, ghost_y in ghost_positions:
+                    g_dx = neighbor[0] - ghost_x
+                    g_dy = neighbor[1] - ghost_y
+                    ghost_distance = math.sqrt(g_dx*g_dx + g_dy*g_dy)
+                    
+                    # Add penalty for proximity to ghosts
+                    if ghost_distance < self.ROAD_WIDTH * 5:
+                        # The closer the ghost, the higher the penalty
+                        tentative_g += (self.ROAD_WIDTH * 5 - ghost_distance) * 2
+                
+                # If neighbor not in open set, add it
+                if neighbor not in open_set:
+                    open_set.add(neighbor)
+                # If this path to neighbor is worse than previous one, skip
+                elif tentative_g >= g_score.get(neighbor, float('inf')):
+                    continue
+                    
+                # This path is best so far - record it
+                came_from[neighbor] = current
+                g_score[neighbor] = tentative_g
+                f_score[neighbor] = tentative_g + heuristic(neighbor, end, ghost_positions)
+                
+        # No path found
+        return None
+
     def initiate_reroute(self, smart_car, obstacle_car):
-        """Initiate rerouting to avoid a potential collision"""
+        """Initiate rerouting to avoid a potential collision, now with ghost avoidance"""
         if not self.route or self.current_target >= len(self.route):
             return
             
@@ -1046,18 +1329,21 @@ class SimpleVisualizer(Node):
             next_waypoint = self.route[current_target]
             node_to_avoid = next_waypoint
             
-            print(f"Initiating preemptive reroute to avoid node {node_to_avoid}")
+            print(f"Initiating ghost-aware reroute to avoid node {node_to_avoid}")
             end_point = self.route[-1]
             
             # Find nearest intersection to current position
             start_intersection = self._find_nearest_intersection(current_pos)
             
             if start_intersection:
-                # Use our pathfinding to avoid the node
-                new_route = self.find_path_avoiding_node(start_intersection, end_point, node_to_avoid)
+                # Use our enhanced pathfinding to avoid both the node and "ghosts" (white cars)
+                new_route = self.find_path_avoiding_ghosts(start_intersection, end_point, node_to_avoid)
                 
                 if new_route and len(new_route) > 1:
-                    print(f"Found preemptive alternative route with {len(new_route)} points")
+                    # Check safety score of the new route
+                    safety = self.calculate_path_safety(new_route)
+                    print(f"Found ghost-aware route with {len(new_route)} points (safety: {safety}/100)")
+                    
                     # Replace route from current position onwards
                     smart_car.route = [current_pos] + new_route
                     smart_car.current_target = 1  # Start from next point
@@ -1086,56 +1372,6 @@ class SimpleVisualizer(Node):
                 
         return closest_point
     
-    def find_path_avoiding_node(self, start, end, avoid_node):
-        """Find a path from start to end that avoids a specific node"""
-        if start == end:
-            return [start]
-            
-        # Build an adjacency list based on actual roads, excluding those with avoid_node
-        adjacency = {}
-        for point in self.intersections:
-            if point != avoid_node:  # Don't include the node to avoid
-                adjacency[point] = []
-            
-        # Add connected points based on actual roads
-        for road in self.roads:
-            a, b = road
-            # Skip roads with avoid_node
-            if avoid_node in road:
-                continue
-                
-            # Add both directions
-            if a in adjacency:
-                adjacency[a].append(b)
-            if b in adjacency:
-                adjacency[b].append(a)
-        
-        # Check if either start or end is not in adjacency list
-        if start not in adjacency or end not in adjacency:
-            return None  # No path possible
-        
-        # Breadth-first search
-        visited = set()
-        queue = [(start, [start])]
-        
-        while queue:
-            current, path = queue.pop(0)
-            
-            if current == end:
-                return path
-                
-            if current in visited:
-                continue
-                
-            visited.add(current)
-            
-            # Add neighbors from adjacency list
-            for neighbor in adjacency.get(current, []):
-                if neighbor not in visited:
-                    queue.append((neighbor, path + [neighbor]))
-        
-        return None  # No path found
-
     def random_start_finish(self):
         """Randomly select start and finish points and generate a route"""
         if not self.intersections or len(self.intersections) < 2:
@@ -1166,26 +1402,166 @@ class SimpleVisualizer(Node):
             self.smart_car = SmartCar(self.start_point[0], self.start_point[1], [], self)
             self.smart_car.set_map_data(self.intersections, self.roads)
             
-            # Find path between points
-            path = self.find_path(self.start_point, self.end_point)
+            # Find ghost-aware path between points
+            path = self.find_path_avoiding_ghosts(self.start_point, self.end_point)
             if path:
+                safety = self.calculate_path_safety(path)
+                print(f"Found ghost-aware route with {len(path)} points (safety: {safety}/100)")
                 self.route = path
                 self.current_target = 1  # Skip start point
                 # Update the smart car's route
                 self.smart_car.route = path
                 self.smart_car.original_route = path.copy()
                 self.smart_car.current_target = 1
-                print(f"Found valid route with {len(path)} points")
                 return True
             else:
-                print("No valid path found between random points")
-                return False
+                # Fall back to regular pathfinding if ghost-aware fails
+                print("Ghost-aware routing failed, falling back to regular routing")
+                path = self.find_path(self.start_point, self.end_point)
+                if path:
+                    self.route = path
+                    self.current_target = 1  # Skip start point
+                    # Update the smart car's route
+                    self.smart_car.route = path
+                    self.smart_car.original_route = path.copy()
+                    self.smart_car.current_target = 1
+                    print(f"Found fallback route with {len(path)} points")
+                    return True
+                else:
+                    print("No valid path found between random points")
+                    return False
                 
         except Exception as e:
             print(f"Error creating SmartCar with random route: {e}")
             import traceback
             traceback.print_exc()
             return False
+
+    def check_route_for_conflicts(self):
+        """
+        Preventatively check entire route for potential conflicts with white cars
+        Like a flu shot, prevents problems before they occur
+        Returns: 
+            - bool: True if conflicts found, False if route is clear
+            - int: Index of first conflicted waypoint
+            - float: Safety score of the route (0-100)
+        """
+        if not self.route or not self.smart_car or len(self.route) <= self.current_target:
+            return False, -1, 100  # No conflicts possible
+            
+        # Get current position
+        current_pos = (self.smart_car.x, self.smart_car.y)
+        
+        # Get remaining route waypoints
+        remaining_route = self.route[self.current_target:]
+        
+        # Check each waypoint along the route for nearby white cars
+        conflicts = []
+        for i, waypoint in enumerate(remaining_route):
+            # Check distance to all white cars
+            for car in self.white_cars:
+                dx = waypoint[0] - car.x
+                dy = waypoint[1] - car.y
+                distance = math.sqrt(dx*dx + dy*dy)
+                
+                # Calculate relative velocity to estimate future position
+                rel_vx = 0
+                rel_vy = 0
+                if hasattr(car, 'vehicle') and hasattr(car.vehicle, 'vx') and hasattr(car.vehicle, 'vy'):
+                    rel_vx = car.vehicle.vx
+                    rel_vy = car.vehicle.vy
+                
+                # Estimated steps to reach this waypoint from current position
+                if i == 0:
+                    dx_to_waypoint = waypoint[0] - current_pos[0]
+                    dy_to_waypoint = waypoint[1] - current_pos[1]
+                else:
+                    dx_to_waypoint = waypoint[0] - remaining_route[i-1][0]
+                    dy_to_waypoint = waypoint[1] - remaining_route[i-1][1]
+                
+                dist_to_waypoint = math.sqrt(dx_to_waypoint*dx_to_waypoint + dy_to_waypoint*dy_to_waypoint)
+                steps_to_waypoint = dist_to_waypoint / self.smart_car.speed if self.smart_car.speed > 0 else 100
+                
+                # Predict where the white car will be when we reach this waypoint
+                future_car_x = car.x + rel_vx * steps_to_waypoint
+                future_car_y = car.y + rel_vy * steps_to_waypoint
+                
+                # Calculate distance to predicted future position
+                future_dx = waypoint[0] - future_car_x
+                future_dy = waypoint[1] - future_car_y
+                future_distance = math.sqrt(future_dx*future_dx + future_dy*future_dy)
+                
+                # Check if future position creates a conflict
+                conflict_threshold = self.ROAD_WIDTH * 3
+                if future_distance < conflict_threshold:
+                    conflicts.append((i, waypoint, car, future_distance))
+        
+        # Calculate route safety score (100 = completely safe, 0 = very dangerous)
+        total_deduction = 0
+        for _, waypoint, car, distance in conflicts:
+            # Closer conflicts cause bigger deductions
+            safety_deduction = 30 * (self.ROAD_WIDTH * 3 - distance) / (self.ROAD_WIDTH * 3)
+            total_deduction += safety_deduction
+        
+        safety_score = max(0, 100 - total_deduction)
+        
+        # Return conflict status
+        if conflicts:
+            # Return index of first conflicted waypoint and safety score
+            first_conflict = min(conflicts, key=lambda x: x[0])
+            return True, first_conflict[0] + self.current_target, safety_score
+        
+        return False, -1, safety_score
+    
+    def preventative_reroute(self):
+        """
+        Proactively reroute to avoid white cars in the planned route
+        This is like a flu shot - prevents problems before they occur
+        """
+        # Check if route needs to be checked
+        has_conflicts, conflict_index, safety_score = self.check_route_for_conflicts()
+        
+        print(f"Route safety check: Score {safety_score:.1f}/100")
+        
+        # If route is safe enough, do nothing
+        if safety_score >= self.route_safety_threshold:
+            return False
+            
+        # If we have conflicts, try to find a safer route
+        if has_conflicts and conflict_index >= 0:
+            print(f"Preventative rerouting: Conflict detected at waypoint {conflict_index}")
+            
+            # Get current position and end goal
+            current_pos = (self.smart_car.x, self.smart_car.y)
+            end_point = self.route[-1]
+            
+            # Find nearest intersection to current position
+            start_intersection = self._find_nearest_intersection(current_pos)
+            
+            # Get the conflict point to avoid
+            conflict_point = self.route[conflict_index]
+            
+            if start_intersection:
+                # Find a ghost-aware route avoiding the conflict point
+                new_route = self.find_path_avoiding_ghosts(start_intersection, end_point, conflict_point)
+                
+                if new_route and len(new_route) > 1:
+                    # Check safety of new route
+                    new_safety = self.calculate_path_safety(new_route)
+                    
+                    # Only use new route if it's safer
+                    if new_safety > safety_score:
+                        print(f"Preventative reroute: Found safer route (Score: {new_safety:.1f}/100)")
+                        self.smart_car.route = [current_pos] + new_route
+                        self.smart_car.current_target = 1
+                        self.route = self.smart_car.route
+                        self.current_target = 1
+                        self.smart_car.current_strategy = CollisionStrategy.REROUTE
+                        return True
+                    else:
+                        print(f"Preventative reroute: New route not safer ({new_safety:.1f} ≤ {safety_score:.1f})")
+        
+        return False
 
 
 class WhiteCar:
