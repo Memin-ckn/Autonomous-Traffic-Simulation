@@ -407,6 +407,42 @@ class SimpleVisualizer(Node):
             # Store current target speed for smooth adjustment
             target_speed = self.smart_car.default_speed
 
+            # Strict pre-move collision check: simulate next position and block move if collision would occur
+            # Only do this if speed > 0 (i.e., car is trying to move)
+            if self.smart_car.speed > 0:
+                # Calculate next position based on current speed and angle
+                dt = 1  # Assume 1 time step for now (can be adjusted if needed)
+                rad_angle = math.radians(self.smart_car.angle)
+                next_x = self.smart_car.x + math.cos(rad_angle) * self.smart_car.speed * dt
+                next_y = self.smart_car.y + math.sin(rad_angle) * self.smart_car.speed * dt
+                # Create a temporary car object at the next position
+                class TempCar:
+                    def __init__(self, x, y, angle, car_id=None):
+                        self.x = x
+                        self.y = y
+                        self.angle = angle
+                        self.id = car_id
+                temp_car = TempCar(next_x, next_y, self.smart_car.angle, car_id="purple_car")
+                # Check for collision with any white car, but only yield if the white car is approaching from the side
+                overlap = False
+                for car in self.white_cars:
+                    # Calculate angle difference
+                    if hasattr(car, 'angle'):
+                        angle_diff = abs((self.smart_car.angle - car.angle + 180) % 360 - 180)
+                        # Only yield if the white car is approaching from the side (angle_diff < 75) or from behind (angle_diff > 105 and < 255)
+                        # Ignore if the white car is in front (75 <= angle_diff <= 105)
+                        if angle_diff < 75 or (angle_diff > 105 and angle_diff < 255):
+                            if self.check_collision(temp_car, car):
+                                overlap = True
+                                break
+                if overlap:
+                    # Block movement and set speed to zero
+                    self.smart_car.speed = 0.0
+                    self.smart_car.collision_risk = True
+                    self.smart_car.current_strategy = CollisionStrategy.YIELD
+                    # Do not update position, skip the rest of the update
+                    return
+
             # Check if we're approaching a turn and need to slow down
             turn_slowdown_factor = 1.0  # Default: no slowdown
             approaching_turn = False

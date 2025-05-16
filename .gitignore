@@ -82,3 +82,5 @@ coverage.xml
 *.tmp
 *~.nib
 local.properties
+build/traffic_simulation/prefix_override/__pycache__/sitecustomize.cpython-312.pyc
+log/latest_build
