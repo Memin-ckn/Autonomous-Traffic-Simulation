@@ -1,7 +1,7 @@
 Metadata-Version: 2.1
 Name: traffic-simulation
-Version: 0.0.1
-Summary: Traffic simulation package
-Maintainer: memin
-Maintainer-email: memin@todo.todo
-License: TODO: License declaration
+Version: 0.1.0
+Summary: ROS2 traffic simulation with component-based architecture
+Maintainer: Traffic Simulation Team
+Maintainer-email: team@trafficsim.org
+License: Apache License 2.0

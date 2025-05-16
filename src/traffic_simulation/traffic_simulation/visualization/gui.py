@@ -1,11 +1,12 @@
 import pygame
+import sys
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Int32MultiArray
 from geometry_msgs.msg import Point
 import random
 import math
-from traffic_simulation.visualization.vehicle import VehicleManager
+from traffic_simulation.visualization.vehicle_visualization import VehicleManager
 from traffic_simulation.planning.path_finder import PathFinder
 
 class FullscreenKavsakSim(Node):

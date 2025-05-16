@@ -1,3 +1,4 @@
+README.md
 package.xml
 setup.cfg
 setup.py
@@ -10,6 +11,7 @@ setup.py
 ../../build/traffic_simulation/traffic_simulation.egg-info/zip-safe
 launch/simple_visualizer.launch.py
 launch/traffic_sim.launch.py
+launch/traffic_simulation.launch.py
 resource/traffic_simulation
 test/test_copyright.py
 test/test_flake8.py
@@ -33,5 +35,12 @@ traffic_simulation/vehicles/__init__.py
 traffic_simulation/vehicles/vehicle.py
 traffic_simulation/visualization/__init__.py
 traffic_simulation/visualization/gui.py
+traffic_simulation/visualization/refactored_visualizer.py
 traffic_simulation/visualization/simple_visualizer.py
+traffic_simulation/visualization/simple_visualizer_updated.py
 traffic_simulation/visualization/vehicle.py
+traffic_simulation/visualization/components/__init__.py
+traffic_simulation/visualization/components/collision_detector.py
+traffic_simulation/visualization/components/renderer.py
+traffic_simulation/visualization/components/ui_manager.py
+traffic_simulation/visualization/components/world_model.py
