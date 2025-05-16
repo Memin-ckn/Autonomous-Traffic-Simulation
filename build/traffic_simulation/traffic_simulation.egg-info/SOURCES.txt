@@ -16,12 +16,14 @@ resource/traffic_simulation
 test/test_copyright.py
 test/test_flake8.py
 test/test_pep257.py
+tests/test_car.py
 tests/test_collision_imports.py
 traffic_simulation/__init__.py
 traffic_simulation/communication/__init__.py
 traffic_simulation/communication/iot.py
 traffic_simulation/control/__init__.py
 traffic_simulation/control/collision_avoidance.py
+traffic_simulation/control/collision_avoidance_node.py
 traffic_simulation/control/path_follower.py
 traffic_simulation/planning/__init__.py
 traffic_simulation/planning/collision_avoidance.py
@@ -30,6 +32,7 @@ traffic_simulation/planning/path_planner.py
 traffic_simulation/planning/route_planner.py
 traffic_simulation/sensors/__init__.py
 traffic_simulation/sensors/sensor.py
+traffic_simulation/unused/simple_car.py
 traffic_simulation/utils/__init__.py
 traffic_simulation/vehicles/__init__.py
 traffic_simulation/vehicles/vehicle.py
@@ -39,6 +42,7 @@ traffic_simulation/visualization/refactored_visualizer.py
 traffic_simulation/visualization/simple_visualizer.py
 traffic_simulation/visualization/simple_visualizer_updated.py
 traffic_simulation/visualization/vehicle.py
+traffic_simulation/visualization/vehicle_visualization.py
 traffic_simulation/visualization/components/__init__.py
 traffic_simulation/visualization/components/collision_detector.py
 traffic_simulation/visualization/components/renderer.py

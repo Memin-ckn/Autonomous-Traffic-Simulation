@@ -90,7 +90,7 @@ traffic_simulation/
 1. Clone the repository to your ROS2 workspace:
 ```bash
 cd ~/ros2_ws/src
-git clone https://github.com/your-repo/traffic_simulation.git
+git clone https://github.com/Memin-ckn/Autonomous-Traffic-Simulation.git
 ```
 
 2. Build the package:
@@ -105,6 +105,20 @@ source ~/ros2_ws/install/setup.bash
 ```
 
 ### Running
+
+The simplest way to run the simulation is using the launch file:
+
+```bash
+cd ~/traffic_sim_ws && colcon build --packages-select traffic_simulation && source install/setup.bash && ros2 launch traffic_simulation traffic_sim.launch.py
+```
+
+This command will:
+1. Navigate to the workspace
+2. Build the traffic simulation package
+3. Source the setup file
+4. Launch the simulation using the launch file
+
+Alternatively, you can run individual components:
 
 Launch the GUI:
 ```bash

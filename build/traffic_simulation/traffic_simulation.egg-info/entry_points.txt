@@ -1,4 +1,5 @@
 [console_scripts]
+collision_avoidance_node = traffic_simulation.control.collision_avoidance_node:main
 gui = traffic_simulation.visualization.gui:main
 refactored_visualizer = traffic_simulation.visualization.refactored_visualizer:main
 simple_visualizer = traffic_simulation.visualization.simple_visualizer:main
