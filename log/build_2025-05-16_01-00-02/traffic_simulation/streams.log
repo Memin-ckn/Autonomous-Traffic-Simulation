@@ -1,0 +1,25 @@
+[0.825s] Invoking command in '/home/memin/traffic_sim_ws/src/traffic_simulation': PYTHONPATH=/home/memin/traffic_sim_ws/build/traffic_simulation/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/traffic_simulation build --build-base /home/memin/traffic_sim_ws/build/traffic_simulation/build install --record /home/memin/traffic_sim_ws/build/traffic_simulation/install.log --single-version-externally-managed install_data
+[1.083s] running egg_info
+[1.102s] writing ../../build/traffic_simulation/traffic_simulation.egg-info/PKG-INFO
+[1.103s] writing dependency_links to ../../build/traffic_simulation/traffic_simulation.egg-info/dependency_links.txt
+[1.103s] writing entry points to ../../build/traffic_simulation/traffic_simulation.egg-info/entry_points.txt
+[1.103s] writing requirements to ../../build/traffic_simulation/traffic_simulation.egg-info/requires.txt
+[1.103s] writing top-level names to ../../build/traffic_simulation/traffic_simulation.egg-info/top_level.txt
+[1.144s] reading manifest file '../../build/traffic_simulation/traffic_simulation.egg-info/SOURCES.txt'
+[1.145s] writing manifest file '../../build/traffic_simulation/traffic_simulation.egg-info/SOURCES.txt'
+[1.146s] running build
+[1.146s] running build_py
+[1.146s] copying traffic_simulation/visualization/simple_visualizer.py -> /home/memin/traffic_sim_ws/build/traffic_simulation/build/lib/traffic_simulation/visualization
+[1.148s] running install
+[1.153s] running install_lib
+[1.173s] copying /home/memin/traffic_sim_ws/build/traffic_simulation/build/lib/traffic_simulation/visualization/simple_visualizer.py -> /home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages/traffic_simulation/visualization
+[1.174s] byte-compiling /home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages/traffic_simulation/visualization/simple_visualizer.py to simple_visualizer.cpython-312.pyc
+[1.186s] running install_data
+[1.186s] running install_egg_info
+[1.207s] removing '/home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages/traffic_simulation-0.0.1-py3.12.egg-info' (and everything under it)
+[1.207s] Copying ../../build/traffic_simulation/traffic_simulation.egg-info to /home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages/traffic_simulation-0.0.1-py3.12.egg-info
+[1.208s] running install_scripts
+[1.337s] Installing gui script to /home/memin/traffic_sim_ws/install/traffic_simulation/lib/traffic_simulation
+[1.337s] Installing simple_visualizer script to /home/memin/traffic_sim_ws/install/traffic_simulation/lib/traffic_simulation
+[1.338s] writing list of installed files to '/home/memin/traffic_sim_ws/build/traffic_simulation/install.log'
+[1.369s] Invoked command in '/home/memin/traffic_sim_ws/src/traffic_simulation' returned '0': PYTHONPATH=/home/memin/traffic_sim_ws/build/traffic_simulation/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/traffic_simulation build --build-base /home/memin/traffic_sim_ws/build/traffic_simulation/build install --record /home/memin/traffic_sim_ws/build/traffic_simulation/install.log --single-version-externally-managed install_data

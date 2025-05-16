@@ -98,18 +98,18 @@ class SimpleVisualizer(Node):
         self.show_hitboxes = False  # Toggle with 'H' key
         
         # Detection and avoidance parameters
-        self.detection_range = self.ROAD_WIDTH * 10  # Larger detection zone
-        self.safety_zone_size = 1.5  # Multiplier for safety zone
-        self.detection_zone_size = 3.5  # Increased size for detection zone 
+        self.detection_range = self.ROAD_WIDTH * 12  # Increase detection zone (was 10)
+        self.safety_zone_size = 2.0  # Increase safety zone multiplier (was 1.5)
+        self.detection_zone_size = 4.0  # Increase detection zone size (was 3.5)
         
         # Movement smoothing parameters
         self.acceleration_rate = 0.05  # How quickly cars accelerate
-        self.deceleration_rate = 0.08  # How quickly cars decelerate
+        self.deceleration_rate = 0.1   # Increase deceleration rate for quicker stopping (was 0.08)
         self.min_speed = 0.1  # Minimum speed when slowing down
         
         # Route planning parameters
         self.route_check_interval = 30  # Check route every 30 frames (about once per second)
-        self.preventative_reroute = True  # Enable preventative rerouting
+        self.preventative_reroute_enabled = True  # Enable preventative rerouting
         self.route_safety_threshold = 50  # Minimum safety score to avoid rerouting
         self.route_check_count = 0  # Counter for checking route
         
@@ -370,7 +370,7 @@ class SimpleVisualizer(Node):
             
             # Periodically check if we need preventative rerouting (like a flu shot)
             self.route_check_count += 1
-            if self.preventative_reroute and self.route_check_count >= self.route_check_interval:
+            if self.preventative_reroute_enabled and self.route_check_count >= self.route_check_interval:
                 self.route_check_count = 0
                 is_rerouted = self.preventative_reroute()
                 if is_rerouted:
@@ -378,6 +378,19 @@ class SimpleVisualizer(Node):
                     # Update our target tracking to match the smart car
                     self.current_target = self.smart_car.current_target
                     return
+            
+            # Pre-check for potential threats - white cars in vicinity even without predicted collisions
+            for car in self.white_cars:
+                dx = car.x - self.smart_car.x
+                dy = car.y - self.smart_car.y
+                distance = math.sqrt(dx*dx + dy*dy)
+                
+                # Just being in the vicinity will cause some caution
+                if distance <= self.ROAD_WIDTH * 6:  # Increased caution zone 
+                    self.smart_car.collision_risk = True
+                    # Set an initial strategy of slowing down just due to proximity
+                    if not hasattr(self.smart_car, 'current_strategy') or self.smart_car.current_strategy is None:
+                        self.smart_car.current_strategy = CollisionStrategy.SLOW_DOWN
             
             # Reactively check for imminent collisions (treatment, not prevention)
             # This handles cases where preventative measures failed or weren't enough
@@ -404,17 +417,20 @@ class SimpleVisualizer(Node):
                     if predicted_collisions:
                         closest_collision = min(predicted_collisions, key=lambda x: x[2])
                         _, _, time_to_collision = closest_collision
-                        # The closer the collision, the slower we go
-                        slowdown_factor = max(0.1, time_to_collision / 8.0)
+                        # The closer the collision, the slower we go - make slowdown more aggressive
+                        slowdown_factor = max(0.05, time_to_collision / 10.0)  # More aggressive slowdown
                         target_speed = self.smart_car.default_speed * slowdown_factor
+                    else:
+                        # Even with no specific predicted collision, slow down just due to proximity
+                        target_speed = self.smart_car.default_speed * 0.6  # 60% of normal speed
             
             # Smoothly adjust the actual speed toward the target speed
             if self.smart_car.speed < target_speed:
                 # Accelerate gradually
                 self.smart_car.speed = min(self.smart_car.speed + self.acceleration_rate, target_speed)
             elif self.smart_car.speed > target_speed:
-                # Decelerate gradually
-                self.smart_car.speed = max(self.smart_car.speed - self.deceleration_rate, target_speed)
+                # Decelerate gradually - make deceleration faster for safety
+                self.smart_car.speed = max(self.smart_car.speed - self.deceleration_rate * 1.5, target_speed)
                 # Ensure we don't go below minimum speed unless target is 0
                 if target_speed > 0:
                     self.smart_car.speed = max(self.smart_car.speed, self.min_speed)
@@ -1032,8 +1048,18 @@ class SimpleVisualizer(Node):
                     # Assume they're in different lanes and won't collide
                     return False
         
+        # Use a larger safety margin for the purple car (SmartCar) to keep it further away
+        # from white cars
+        purple_safety_margin = 1.5  # Increase the collision boundary by 50%
+        
         # Get corners of both cars
-        corners1 = self.get_car_corners(car1.x, car1.y, car1.angle)
+        # If car1 is the purple car (SmartCar), use the larger safety margin
+        if hasattr(car1, 'id') and car1.id == "purple_car":
+            corners1 = self.get_car_corners(car1.x, car1.y, car1.angle, safety_margin=purple_safety_margin)
+        else:
+            corners1 = self.get_car_corners(car1.x, car1.y, car1.angle)
+            
+        # Always use normal hitbox for white cars
         corners2 = self.get_car_corners(car2.x, car2.y, car2.angle)
         
         # Get edges from corners
@@ -1111,12 +1137,15 @@ class SimpleVisualizer(Node):
             
             # Create temporary objects to represent future positions
             class TempCar:
-                def __init__(self, x, y, angle):
+                def __init__(self, x, y, angle, car_id=None):
                     self.x = x
                     self.y = y
                     self.angle = angle
+                    self.id = car_id
             
-            future_car1 = TempCar(future_x1, future_y1, angle1)
+            # Pass the car's ID if it's the purple car
+            future_car1 = TempCar(future_x1, future_y1, angle1, 
+                                car_id="purple_car" if hasattr(car1, 'id') and car1.id == "purple_car" else None)
             future_car2 = TempCar(future_x2, future_y2, angle2)
             
             if self.check_collision(future_car1, future_car2):
@@ -1177,8 +1206,9 @@ class SimpleVisualizer(Node):
                     dy = car.y - self.smart_car.y
                     distance = math.sqrt(dx*dx + dy*dy)
                     
+                    # Increase detection range for more proactive avoidance
                     # Only consider cars within the expanded detection range
-                    if distance <= self.detection_range:
+                    if distance <= self.detection_range * 1.25:  # Increase detection range by 25%
                         will_collide, time_to_collision = self.predict_collision(self.smart_car, car)
                         if will_collide:
                             predicted_collisions.append((self.smart_car, car, time_to_collision))
@@ -1187,15 +1217,34 @@ class SimpleVisualizer(Node):
                             self.smart_car.collision_risk = True
                             
                             # Very close collision - slow down significantly
-                            if time_to_collision <= 5:  # Increased from 3 to 5 for earlier reaction
+                            if time_to_collision <= 7:  # Increased from 5 to 7 for earlier reaction
                                 self.smart_car.current_strategy = CollisionStrategy.SLOW_DOWN
                                 
-                            # Further collision - try to reroute
-                            elif time_to_collision <= 10:  # Increased from 7 to 10 for earlier rerouting
-                                # Only reroute if we weren't already doing so
-                                if self.smart_car.current_strategy != CollisionStrategy.REROUTE:
-                                    # Trigger rerouting logic
-                                    self.initiate_reroute(self.smart_car, car)
+                            # Further collision - consider rerouting only if we're near an intersection
+                            elif time_to_collision <= 12:  # Increased from 10 to 12 for earlier rerouting
+                                # Find the nearest intersection
+                                current_pos = (self.smart_car.x, self.smart_car.y)
+                                nearest_intersection = self._find_nearest_intersection(current_pos)
+                                
+                                if nearest_intersection:
+                                    # Check distance to nearest intersection
+                                    dx = current_pos[0] - nearest_intersection[0]
+                                    dy = current_pos[1] - nearest_intersection[1]
+                                    dist_to_intersection = math.sqrt(dx*dx + dy*dy)
+                                    
+                                    # Only try to reroute if we're close to an intersection
+                                    # Otherwise just slow down and wait until we reach one
+                                    if dist_to_intersection < self.ROAD_WIDTH * 0.8:
+                                        # We're close to an intersection, rerouting is reasonable
+                                        if self.smart_car.current_strategy != CollisionStrategy.REROUTE:
+                                            # Trigger rerouting logic
+                                            self.initiate_reroute(self.smart_car, car)
+                                    else:
+                                        # We're in the middle of a road, just slow down
+                                        self.smart_car.current_strategy = CollisionStrategy.SLOW_DOWN
+                                else:
+                                    # No intersection found, just slow down
+                                    self.smart_car.current_strategy = CollisionStrategy.SLOW_DOWN
         
         return collisions, predicted_collisions
     
@@ -1319,9 +1368,29 @@ class SimpleVisualizer(Node):
     def initiate_reroute(self, smart_car, obstacle_car):
         """Initiate rerouting to avoid a potential collision, now with ghost avoidance"""
         if not self.route or self.current_target >= len(self.route):
-            return
+            return False
             
         current_pos = (smart_car.x, smart_car.y)
+        
+        # Find nearest intersection to current position
+        nearest_intersection = self._find_nearest_intersection(current_pos)
+        if not nearest_intersection:
+            return False
+            
+        # Check if we're close enough to an intersection to reroute
+        # Only reroute if we're at or very near an intersection
+        dx = current_pos[0] - nearest_intersection[0]
+        dy = current_pos[1] - nearest_intersection[1]
+        distance_to_intersection = math.sqrt(dx*dx + dy*dy)
+        
+        # If we're not near an intersection, don't reroute - just slow down
+        if distance_to_intersection > self.ROAD_WIDTH * 0.8:
+            # We're in the middle of a road, not at an intersection
+            # Just slow down instead of rerouting
+            smart_car.current_strategy = CollisionStrategy.SLOW_DOWN
+            return False
+            
+        # We're at an intersection, so we can reroute
         current_target = smart_car.current_target
         
         if current_target < len(self.route):
@@ -1329,30 +1398,79 @@ class SimpleVisualizer(Node):
             next_waypoint = self.route[current_target]
             node_to_avoid = next_waypoint
             
-            print(f"Initiating ghost-aware reroute to avoid node {node_to_avoid}")
+            # Make sure we're not trying to avoid the current intersection
+            if node_to_avoid == nearest_intersection:
+                # We're at the intersection we're trying to avoid
+                # Move to the next target if possible, otherwise just slow down
+                if current_target + 1 < len(self.route):
+                    node_to_avoid = self.route[current_target + 1]
+                else:
+                    # No more waypoints, just slow down
+                    smart_car.current_strategy = CollisionStrategy.SLOW_DOWN
+                    return False
+            
+            print(f"Initiating ghost-aware reroute at intersection to avoid node {node_to_avoid}")
             end_point = self.route[-1]
             
-            # Find nearest intersection to current position
-            start_intersection = self._find_nearest_intersection(current_pos)
+            # Use the current intersection as the starting point for rerouting
+            start_intersection = nearest_intersection
             
-            if start_intersection:
-                # Use our enhanced pathfinding to avoid both the node and "ghosts" (white cars)
-                new_route = self.find_path_avoiding_ghosts(start_intersection, end_point, node_to_avoid)
+            # Check if the next segment follows the road network
+            # (prevent suggesting a route that cuts across non-road areas)
+            if current_target + 1 < len(self.route):
+                next_point = self.route[current_target + 1]
+                if not self.has_road_between(nearest_intersection, next_point):
+                    # No direct road to next point, find a valid route
+                    print("No direct road to next waypoint, finding valid route")
+            
+            # Use our enhanced pathfinding to avoid both the node and "ghosts" (white cars)
+            new_route = self.find_path_avoiding_ghosts(start_intersection, end_point, node_to_avoid)
+            
+            if new_route and len(new_route) > 1:
+                # Check safety score of the new route
+                safety = self.calculate_path_safety(new_route)
                 
-                if new_route and len(new_route) > 1:
-                    # Check safety score of the new route
-                    safety = self.calculate_path_safety(new_route)
-                    print(f"Found ghost-aware route with {len(new_route)} points (safety: {safety}/100)")
+                # Only reroute if the new route is reasonably safe
+                # and doesn't backtrack significantly (prevent U-turns)
+                if safety > 30:  # Minimum safety threshold
+                    # Check if this would cause a U-turn
+                    is_uturn = False
                     
-                    # Replace route from current position onwards
-                    smart_car.route = [current_pos] + new_route
-                    smart_car.current_target = 1  # Start from next point
-                    # Update visualizer's route
-                    self.route = smart_car.route
-                    self.current_target = 1
-                    # Set the strategy to REROUTE
-                    smart_car.current_strategy = CollisionStrategy.REROUTE
-                    return True
+                    # If we have a current direction, see if the new route turns us back
+                    if hasattr(smart_car, 'angle'):
+                        # Get the direction to first point in new route
+                        if len(new_route) > 1:
+                            new_dx = new_route[1][0] - start_intersection[0] 
+                            new_dy = new_route[1][1] - start_intersection[1]
+                            new_angle = math.degrees(math.atan2(new_dy, new_dx))
+                            
+                            # Calculate angle difference
+                            angle_diff = abs((new_angle - smart_car.angle + 180) % 360 - 180)
+                            
+                            # If the angle difference is too large, it's a U-turn
+                            if angle_diff > 135:  # More than 135 degrees is a U-turn
+                                is_uturn = True
+                                print(f"Rejecting reroute: Would cause U-turn (angle diff: {angle_diff:.1f}°)")
+                    
+                    if not is_uturn:
+                        print(f"Found ghost-aware route with {len(new_route)} points (safety: {safety}/100)")
+                        
+                        # Replace route from current position onwards
+                        smart_car.route = [current_pos] + new_route
+                        smart_car.current_target = 1  # Start from next point
+                        # Update visualizer's route
+                        self.route = smart_car.route
+                        self.current_target = 1
+                        # Set the strategy to REROUTE
+                        smart_car.current_strategy = CollisionStrategy.REROUTE
+                        return True
+                    else:
+                        # It's a U-turn, so just slow down instead
+                        smart_car.current_strategy = CollisionStrategy.SLOW_DOWN
+                else:
+                    print(f"Rejecting reroute: Safety too low ({safety}/100)")
+                    # Route is not safe enough, just slow down
+                    smart_car.current_strategy = CollisionStrategy.SLOW_DOWN
         
         return False
 
@@ -1536,21 +1654,53 @@ class SimpleVisualizer(Node):
             end_point = self.route[-1]
             
             # Find nearest intersection to current position
-            start_intersection = self._find_nearest_intersection(current_pos)
+            nearest_intersection = self._find_nearest_intersection(current_pos)
+            
+            # Check if we're close to an intersection
+            if nearest_intersection:
+                dx = current_pos[0] - nearest_intersection[0]
+                dy = current_pos[1] - nearest_intersection[1]
+                dist_to_intersection = math.sqrt(dx*dx + dy*dy)
+                
+                # Only reroute at or near intersections
+                if dist_to_intersection > self.ROAD_WIDTH * 0.8:
+                    print("Not at intersection, skipping preventative reroute")
+                    return False
+            else:
+                return False
             
             # Get the conflict point to avoid
             conflict_point = self.route[conflict_index]
             
-            if start_intersection:
-                # Find a ghost-aware route avoiding the conflict point
-                new_route = self.find_path_avoiding_ghosts(start_intersection, end_point, conflict_point)
+            # Find a ghost-aware route avoiding the conflict point
+            new_route = self.find_path_avoiding_ghosts(nearest_intersection, end_point, conflict_point)
+            
+            if new_route and len(new_route) > 1:
+                # Check safety of new route
+                new_safety = self.calculate_path_safety(new_route)
                 
-                if new_route and len(new_route) > 1:
-                    # Check safety of new route
-                    new_safety = self.calculate_path_safety(new_route)
+                # Only use new route if it's safer and doesn't cause a U-turn
+                if new_safety > safety_score:
+                    # Check if this would cause a U-turn
+                    is_uturn = False
                     
-                    # Only use new route if it's safer
-                    if new_safety > safety_score:
+                    # If we have a current direction, see if the new route turns us back
+                    if hasattr(self.smart_car, 'angle'):
+                        # Get the direction to first point in new route
+                        if len(new_route) > 1:
+                            new_dx = new_route[1][0] - nearest_intersection[0] 
+                            new_dy = new_route[1][1] - nearest_intersection[1]
+                            new_angle = math.degrees(math.atan2(new_dy, new_dx))
+                            
+                            # Calculate angle difference
+                            angle_diff = abs((new_angle - self.smart_car.angle + 180) % 360 - 180)
+                            
+                            # If the angle difference is too large, it's a U-turn
+                            if angle_diff > 135:  # More than 135 degrees is a U-turn
+                                is_uturn = True
+                                print(f"Rejecting preventative reroute: Would cause U-turn (angle diff: {angle_diff:.1f}°)")
+                    
+                    if not is_uturn:
                         print(f"Preventative reroute: Found safer route (Score: {new_safety:.1f}/100)")
                         self.smart_car.route = [current_pos] + new_route
                         self.smart_car.current_target = 1
@@ -1558,8 +1708,8 @@ class SimpleVisualizer(Node):
                         self.current_target = 1
                         self.smart_car.current_strategy = CollisionStrategy.REROUTE
                         return True
-                    else:
-                        print(f"Preventative reroute: New route not safer ({new_safety:.1f} ≤ {safety_score:.1f})")
+                else:
+                    print(f"Preventative reroute: New route not safer ({new_safety:.1f} ≤ {safety_score:.1f})")
         
         return False
 

@@ -1,0 +1,69 @@
+[1.115s] Invoking command in '/home/memin/traffic_sim_ws/src/traffic_simulation': PYTHONPATH=/home/memin/traffic_sim_ws/build/traffic_simulation/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/traffic_simulation build --build-base /home/memin/traffic_sim_ws/build/traffic_simulation/build install --record /home/memin/traffic_sim_ws/build/traffic_simulation/install.log --single-version-externally-managed install_data
+[1.373s] running egg_info
+[1.391s] writing ../../build/traffic_simulation/traffic_simulation.egg-info/PKG-INFO
+[1.393s] writing dependency_links to ../../build/traffic_simulation/traffic_simulation.egg-info/dependency_links.txt
+[1.394s] writing entry points to ../../build/traffic_simulation/traffic_simulation.egg-info/entry_points.txt
+[1.395s] writing requirements to ../../build/traffic_simulation/traffic_simulation.egg-info/requires.txt
+[1.395s] writing top-level names to ../../build/traffic_simulation/traffic_simulation.egg-info/top_level.txt
+[1.434s] reading manifest file '../../build/traffic_simulation/traffic_simulation.egg-info/SOURCES.txt'
+[1.435s] writing manifest file '../../build/traffic_simulation/traffic_simulation.egg-info/SOURCES.txt'
+[1.435s] running build
+[1.435s] running build_py
+[1.436s] copying traffic_simulation/visualization/simple_visualizer.py -> /home/memin/traffic_sim_ws/build/traffic_simulation/build/lib/traffic_simulation/visualization
+[1.437s] copying traffic_simulation/visualization/gui.py -> /home/memin/traffic_sim_ws/build/traffic_simulation/build/lib/traffic_simulation/visualization
+[1.437s] copying traffic_simulation/visualization/vehicle.py -> /home/memin/traffic_sim_ws/build/traffic_simulation/build/lib/traffic_simulation/visualization
+[1.438s] copying traffic_simulation/planning/__init__.py -> /home/memin/traffic_sim_ws/build/traffic_simulation/build/lib/traffic_simulation/planning
+[1.438s] copying traffic_simulation/planning/collision_avoidance.py -> /home/memin/traffic_sim_ws/build/traffic_simulation/build/lib/traffic_simulation/planning
+[1.439s] copying traffic_simulation/planning/path_planner.py -> /home/memin/traffic_sim_ws/build/traffic_simulation/build/lib/traffic_simulation/planning
+[1.440s] copying traffic_simulation/control/path_follower.py -> /home/memin/traffic_sim_ws/build/traffic_simulation/build/lib/traffic_simulation/control
+[1.440s] copying traffic_simulation/control/collision_avoidance.py -> /home/memin/traffic_sim_ws/build/traffic_simulation/build/lib/traffic_simulation/control
+[1.440s] copying traffic_simulation/sensors/__init__.py -> /home/memin/traffic_sim_ws/build/traffic_simulation/build/lib/traffic_simulation/sensors
+[1.441s] copying traffic_simulation/sensors/sensor.py -> /home/memin/traffic_sim_ws/build/traffic_simulation/build/lib/traffic_simulation/sensors
+[1.441s] copying traffic_simulation/communication/__init__.py -> /home/memin/traffic_sim_ws/build/traffic_simulation/build/lib/traffic_simulation/communication
+[1.441s] copying traffic_simulation/communication/iot.py -> /home/memin/traffic_sim_ws/build/traffic_simulation/build/lib/traffic_simulation/communication
+[1.442s] copying traffic_simulation/vehicles/__init__.py -> /home/memin/traffic_sim_ws/build/traffic_simulation/build/lib/traffic_simulation/vehicles
+[1.442s] copying traffic_simulation/vehicles/vehicle.py -> /home/memin/traffic_sim_ws/build/traffic_simulation/build/lib/traffic_simulation/vehicles
+[1.442s] copying tests/test_collision_imports.py -> /home/memin/traffic_sim_ws/build/traffic_simulation/build/lib/tests
+[1.443s] running install
+[1.448s] running install_lib
+[1.467s] copying /home/memin/traffic_sim_ws/build/traffic_simulation/build/lib/tests/test_collision_imports.py -> /home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages/tests
+[1.467s] copying /home/memin/traffic_sim_ws/build/traffic_simulation/build/lib/traffic_simulation/planning/__init__.py -> /home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages/traffic_simulation/planning
+[1.468s] copying /home/memin/traffic_sim_ws/build/traffic_simulation/build/lib/traffic_simulation/planning/collision_avoidance.py -> /home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages/traffic_simulation/planning
+[1.468s] copying /home/memin/traffic_sim_ws/build/traffic_simulation/build/lib/traffic_simulation/planning/path_planner.py -> /home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages/traffic_simulation/planning
+[1.468s] copying /home/memin/traffic_sim_ws/build/traffic_simulation/build/lib/traffic_simulation/vehicles/__init__.py -> /home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages/traffic_simulation/vehicles
+[1.468s] copying /home/memin/traffic_sim_ws/build/traffic_simulation/build/lib/traffic_simulation/vehicles/vehicle.py -> /home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages/traffic_simulation/vehicles
+[1.469s] copying /home/memin/traffic_sim_ws/build/traffic_simulation/build/lib/traffic_simulation/sensors/__init__.py -> /home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages/traffic_simulation/sensors
+[1.469s] copying /home/memin/traffic_sim_ws/build/traffic_simulation/build/lib/traffic_simulation/sensors/sensor.py -> /home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages/traffic_simulation/sensors
+[1.469s] copying /home/memin/traffic_sim_ws/build/traffic_simulation/build/lib/traffic_simulation/visualization/simple_visualizer.py -> /home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages/traffic_simulation/visualization
+[1.470s] copying /home/memin/traffic_sim_ws/build/traffic_simulation/build/lib/traffic_simulation/visualization/gui.py -> /home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages/traffic_simulation/visualization
+[1.470s] copying /home/memin/traffic_sim_ws/build/traffic_simulation/build/lib/traffic_simulation/visualization/vehicle.py -> /home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages/traffic_simulation/visualization
+[1.471s] copying /home/memin/traffic_sim_ws/build/traffic_simulation/build/lib/traffic_simulation/control/path_follower.py -> /home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages/traffic_simulation/control
+[1.471s] copying /home/memin/traffic_sim_ws/build/traffic_simulation/build/lib/traffic_simulation/control/collision_avoidance.py -> /home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages/traffic_simulation/control
+[1.471s] copying /home/memin/traffic_sim_ws/build/traffic_simulation/build/lib/traffic_simulation/communication/__init__.py -> /home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages/traffic_simulation/communication
+[1.471s] copying /home/memin/traffic_sim_ws/build/traffic_simulation/build/lib/traffic_simulation/communication/iot.py -> /home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages/traffic_simulation/communication
+[1.472s] byte-compiling /home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages/tests/test_collision_imports.py to test_collision_imports.cpython-312.pyc
+[1.473s] byte-compiling /home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages/traffic_simulation/planning/__init__.py to __init__.cpython-312.pyc
+[1.474s] byte-compiling /home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages/traffic_simulation/planning/collision_avoidance.py to collision_avoidance.cpython-312.pyc
+[1.476s] byte-compiling /home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages/traffic_simulation/planning/path_planner.py to path_planner.cpython-312.pyc
+[1.477s] byte-compiling /home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages/traffic_simulation/vehicles/__init__.py to __init__.cpython-312.pyc
+[1.478s] byte-compiling /home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages/traffic_simulation/vehicles/vehicle.py to vehicle.cpython-312.pyc
+[1.480s] byte-compiling /home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages/traffic_simulation/sensors/__init__.py to __init__.cpython-312.pyc
+[1.480s] byte-compiling /home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages/traffic_simulation/sensors/sensor.py to sensor.cpython-312.pyc
+[1.482s] byte-compiling /home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages/traffic_simulation/visualization/simple_visualizer.py to simple_visualizer.cpython-312.pyc
+[1.494s] byte-compiling /home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages/traffic_simulation/visualization/gui.py to gui.cpython-312.pyc
+[1.498s] byte-compiling /home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages/traffic_simulation/visualization/vehicle.py to vehicle.cpython-312.pyc
+[1.501s] byte-compiling /home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages/traffic_simulation/control/path_follower.py to path_follower.cpython-312.pyc
+[1.503s] byte-compiling /home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages/traffic_simulation/control/collision_avoidance.py to collision_avoidance.cpython-312.pyc
+[1.504s] byte-compiling /home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages/traffic_simulation/communication/__init__.py to __init__.cpython-312.pyc
+[1.504s] byte-compiling /home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages/traffic_simulation/communication/iot.py to iot.cpython-312.pyc
+[1.506s] running install_data
+[1.506s] copying launch/simple_visualizer.launch.py -> /home/memin/traffic_sim_ws/install/traffic_simulation/share/traffic_simulation/launch
+[1.506s] copying launch/traffic_sim.launch.py -> /home/memin/traffic_sim_ws/install/traffic_simulation/share/traffic_simulation/launch
+[1.506s] running install_egg_info
+[1.526s] removing '/home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages/traffic_simulation-0.0.1-py3.12.egg-info' (and everything under it)
+[1.530s] Copying ../../build/traffic_simulation/traffic_simulation.egg-info to /home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages/traffic_simulation-0.0.1-py3.12.egg-info
+[1.531s] running install_scripts
+[1.658s] Installing gui script to /home/memin/traffic_sim_ws/install/traffic_simulation/lib/traffic_simulation
+[1.659s] Installing simple_visualizer script to /home/memin/traffic_sim_ws/install/traffic_simulation/lib/traffic_simulation
+[1.659s] writing list of installed files to '/home/memin/traffic_sim_ws/build/traffic_simulation/install.log'
+[1.686s] Invoked command in '/home/memin/traffic_sim_ws/src/traffic_simulation' returned '0': PYTHONPATH=/home/memin/traffic_sim_ws/build/traffic_simulation/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/memin/traffic_sim_ws/install/traffic_simulation/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/traffic_simulation build --build-base /home/memin/traffic_sim_ws/build/traffic_simulation/build install --record /home/memin/traffic_sim_ws/build/traffic_simulation/install.log --single-version-externally-managed install_data
