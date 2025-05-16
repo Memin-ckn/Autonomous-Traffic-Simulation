@@ -694,20 +694,53 @@ class SimpleVisualizer(Node):
                 
         # Display route safety score
         if self.route and self.smart_car:
-            _, _, safety_score = self.check_route_for_conflicts()
+            # Calculate safety and efficiency metrics
+            safety_score = self.calculate_path_safety(self.route)
+            efficiency_score = self.calculate_path_efficiency(self.route)
+            
+            # Display the scores with appropriately colored indicators
             safety_font = pygame.font.SysFont('Arial', 18, bold=True)
             
-            # Set color based on safety score
+            # Set color for safety score
             if safety_score >= 80:
                 safety_color = (0, 200, 0)  # Green for safe
             elif safety_score >= 50:
                 safety_color = (255, 165, 0)  # Orange for caution
             else:
                 safety_color = (255, 0, 0)  # Red for dangerous
+            
+            # Set color for efficiency score
+            if efficiency_score >= 90:
+                efficiency_color = (0, 200, 0)  # Green for efficient
+            elif efficiency_score >= 70:
+                efficiency_color = (255, 165, 0)  # Orange for somewhat efficient
+            else:
+                efficiency_color = (255, 0, 0)  # Red for inefficient
                 
+            # Display safety score
             safety_text = f"Route Safety: {safety_score:.1f}/100"
             safety_surface = safety_font.render(safety_text, True, safety_color)
             self.screen.blit(safety_surface, (self.width - safety_surface.get_width() - 20, 50))
+            
+            # Display efficiency score
+            efficiency_text = f"Route Efficiency: {efficiency_score:.1f}%"
+            efficiency_surface = safety_font.render(efficiency_text, True, efficiency_color)
+            self.screen.blit(efficiency_surface, (self.width - efficiency_surface.get_width() - 20, 80))
+            
+            # Calculate and display the combined score (balance of safety and efficiency)
+            combined_score = (safety_score * 0.6) + (efficiency_score * 0.4)  # 60% safety, 40% efficiency
+            
+            # Set color for combined score
+            if combined_score >= 80:
+                combined_color = (0, 200, 0)  # Green for good
+            elif combined_score >= 60:
+                combined_color = (255, 165, 0)  # Orange for average
+            else:
+                combined_color = (255, 0, 0)  # Red for poor
+                
+            combined_text = f"Overall Route Quality: {combined_score:.1f}/100"
+            combined_surface = safety_font.render(combined_text, True, combined_color)
+            self.screen.blit(combined_surface, (self.width - combined_surface.get_width() - 20, 110))
     
     def reset_simulation(self):
         # Reset route data
@@ -1182,6 +1215,41 @@ class SimpleVisualizer(Node):
                     
         return max(0, safety_score)  # Don't go below 0
     
+    def calculate_path_efficiency(self, path, start_point=None, end_point=None):
+        """
+        Calculate how efficient a path is (based on directness and length)
+        Returns a percentage (100% = optimal shortest path)
+        """
+        if not path or len(path) < 2:
+            return 0
+            
+        # Use provided start/end or extract from path
+        start = start_point if start_point else path[0]
+        end = end_point if end_point else path[-1]
+        
+        # Calculate actual path length
+        actual_length = 0
+        for i in range(len(path) - 1):
+            dx = path[i+1][0] - path[i][0]
+            dy = path[i+1][1] - path[i][1]
+            segment_length = math.sqrt(dx*dx + dy*dy)
+            actual_length += segment_length
+            
+        # Calculate/estimate shortest possible path
+        shortest_length = self.estimate_shortest_distance(start, end)
+        if shortest_length == 0:  # Couldn't find a path, use direct distance
+            dx = end[0] - start[0]
+            dy = end[1] - start[1]
+            shortest_length = math.sqrt(dx*dx + dy*dy)
+            
+        # Calculate efficiency (closer to 100% is better)
+        if shortest_length > 0:
+            efficiency = min(100, (shortest_length / actual_length) * 100)
+        else:
+            efficiency = 100  # If both start and end are the same
+            
+        return efficiency
+    
     def check_all_collisions(self):
         """Check for collisions between the purple car and white cars, including predicted collisions"""
         collisions = []
@@ -1252,6 +1320,7 @@ class SimpleVisualizer(Node):
         """
         Find a path that avoids white cars (like Pacman avoiding ghosts)
         Uses A* search algorithm with penalties for paths near white cars
+        Balances between shortest path and safety
         """
         if start == end:
             return [start]
@@ -1286,9 +1355,22 @@ class SimpleVisualizer(Node):
         open_set = {start}
         closed_set = set()
         
-        # Heuristic function - distance to goal plus ghost avoidance
+        # Configuration parameters for balancing safety vs. efficiency
+        # Higher values prioritize safety over shortest path
+        GHOST_PENALTY_WEIGHT = 1.0  # Base penalty weight for ghost proximity
+        MAX_PATH_LENGTH_FACTOR = 1.5  # Allow paths up to 1.5x the shortest possible
+        
+        # First find the shortest path (ignoring ghosts) to use as reference
+        # This gives us a baseline for how long the path should be
+        shortest_distance = self.estimate_shortest_distance(start, end)
+        if shortest_distance == 0:
+            shortest_distance = math.sqrt((end[0] - start[0])**2 + (end[1] - start[1])**2)
+            
+        max_allowed_distance = shortest_distance * MAX_PATH_LENGTH_FACTOR
+        
+        # Heuristic function - balance between distance to goal and ghost avoidance
         def heuristic(node, goal, ghosts):
-            # Base distance to goal
+            # Base distance to goal (straight-line distance)
             dx = node[0] - goal[0]
             dy = node[1] - goal[1]
             base_cost = math.sqrt(dx*dx + dy*dy)
@@ -1304,7 +1386,7 @@ class SimpleVisualizer(Node):
                 # If too close to ghost, add penalty
                 if distance < self.ROAD_WIDTH * 5:
                     # The closer the ghost, the higher the penalty
-                    ghost_cost += (self.ROAD_WIDTH * 5 - distance) * 2
+                    ghost_cost += (self.ROAD_WIDTH * 5 - distance) * GHOST_PENALTY_WEIGHT
                     
             return base_cost + ghost_cost
         
@@ -1312,6 +1394,7 @@ class SimpleVisualizer(Node):
         g_score = {start: 0}  # Cost from start to node
         f_score = {start: heuristic(start, end, ghost_positions)}  # Estimated total cost
         came_from = {}  # Parent nodes
+        real_distance = {start: 0}  # Track actual path distance
         
         while open_set:
             # Find node with lowest f_score
@@ -1335,11 +1418,19 @@ class SimpleVisualizer(Node):
                 if neighbor in closed_set:
                     continue
                     
-                # Calculate tentative g_score
+                # Calculate actual distance traveled
                 distance = math.sqrt((current[0] - neighbor[0])**2 + (current[1] - neighbor[1])**2)
+                tentative_real_distance = real_distance[current] + distance
+                
+                # Skip paths that are too long compared to the shortest possible
+                if tentative_real_distance > max_allowed_distance:
+                    continue
+                
+                # Calculate tentative g_score (path cost)
                 tentative_g = g_score[current] + distance
                 
-                # Extra cost for neighbors near ghosts
+                # Extra cost for neighbors near ghosts - make paths near ghosts more expensive
+                ghost_penalty = 0
                 for ghost_x, ghost_y in ghost_positions:
                     g_dx = neighbor[0] - ghost_x
                     g_dy = neighbor[1] - ghost_y
@@ -1348,7 +1439,11 @@ class SimpleVisualizer(Node):
                     # Add penalty for proximity to ghosts
                     if ghost_distance < self.ROAD_WIDTH * 5:
                         # The closer the ghost, the higher the penalty
-                        tentative_g += (self.ROAD_WIDTH * 5 - ghost_distance) * 2
+                        # Scale the penalty by distance: closer is much worse
+                        proximity_factor = (self.ROAD_WIDTH * 5 - ghost_distance) / (self.ROAD_WIDTH * 5)
+                        ghost_penalty += proximity_factor * GHOST_PENALTY_WEIGHT * distance * 3.0
+                
+                tentative_g += ghost_penalty
                 
                 # If neighbor not in open set, add it
                 if neighbor not in open_set:
@@ -1360,13 +1455,71 @@ class SimpleVisualizer(Node):
                 # This path is best so far - record it
                 came_from[neighbor] = current
                 g_score[neighbor] = tentative_g
+                real_distance[neighbor] = tentative_real_distance
                 f_score[neighbor] = tentative_g + heuristic(neighbor, end, ghost_positions)
                 
         # No path found
         return None
+        
+    def estimate_shortest_distance(self, start, end):
+        """
+        Calculate the shortest possible distance from start to end
+        using only the road network (no ghost avoidance)
+        """
+        if start == end:
+            return 0
+            
+        # If there's a direct road, return the straight-line distance
+        if self.has_road_between(start, end):
+            return math.sqrt((end[0] - start[0])**2 + (end[1] - start[1])**2)
+            
+        # Build adjacency list from road network
+        adjacency = {}
+        for point in self.intersections:
+            adjacency[point] = []
+            
+        for road in self.roads:
+            a, b = road
+            if a in adjacency:
+                adjacency[a].append(b)
+            if b in adjacency:
+                adjacency[b].append(a)
+        
+        # Simple Dijkstra's algorithm to find shortest path
+        dist = {start: 0}
+        queue = [(0, start)]  # (distance, node)
+        visited = set()
+        
+        while queue:
+            (d, current) = min(queue)
+            queue.remove((d, current))
+            
+            if current in visited:
+                continue
+                
+            visited.add(current)
+            
+            if current == end:
+                return d
+                
+            for neighbor in adjacency.get(current, []):
+                if neighbor in visited:
+                    continue
+                    
+                distance = math.sqrt((current[0] - neighbor[0])**2 + (current[1] - neighbor[1])**2)
+                new_dist = dist[current] + distance
+                
+                if neighbor not in dist or new_dist < dist[neighbor]:
+                    dist[neighbor] = new_dist
+                    queue.append((new_dist, neighbor))
+        
+        # If no path found, return a large value
+        return float('inf')
 
     def initiate_reroute(self, smart_car, obstacle_car):
-        """Initiate rerouting to avoid a potential collision, now with ghost avoidance"""
+        """
+        Initiate rerouting to avoid a potential collision, balancing safety and efficiency
+        """
         if not self.route or self.current_target >= len(self.route):
             return False
             
@@ -1409,7 +1562,7 @@ class SimpleVisualizer(Node):
                     smart_car.current_strategy = CollisionStrategy.SLOW_DOWN
                     return False
             
-            print(f"Initiating ghost-aware reroute at intersection to avoid node {node_to_avoid}")
+            print(f"Initiating balanced reroute at intersection to avoid node {node_to_avoid}")
             end_point = self.route[-1]
             
             # Use the current intersection as the starting point for rerouting
@@ -1423,16 +1576,28 @@ class SimpleVisualizer(Node):
                     # No direct road to next point, find a valid route
                     print("No direct road to next waypoint, finding valid route")
             
-            # Use our enhanced pathfinding to avoid both the node and "ghosts" (white cars)
+            # Calculate metrics for current route
+            current_route = self.route[self.current_target:]
+            current_safety = self.calculate_path_safety(current_route)
+            current_efficiency = self.calculate_path_efficiency(current_route, current_pos, end_point)
+            current_score = (current_safety * 0.6) + (current_efficiency * 0.4)
+            
+            # Use our enhanced pathfinding to balance safety and efficiency
             new_route = self.find_path_avoiding_ghosts(start_intersection, end_point, node_to_avoid)
             
             if new_route and len(new_route) > 1:
-                # Check safety score of the new route
-                safety = self.calculate_path_safety(new_route)
+                # Calculate metrics for new route
+                new_safety = self.calculate_path_safety(new_route)
+                new_efficiency = self.calculate_path_efficiency(new_route, start_intersection, end_point)
+                new_score = (new_safety * 0.6) + (new_efficiency * 0.4)
                 
-                # Only reroute if the new route is reasonably safe
-                # and doesn't backtrack significantly (prevent U-turns)
-                if safety > 30:  # Minimum safety threshold
+                print(f"Route comparison - Current: Safety {current_safety:.1f}/100, Efficiency {current_efficiency:.1f}%, " +
+                      f"Overall {current_score:.1f}/100")
+                print(f"Route comparison - New: Safety {new_safety:.1f}/100, Efficiency {new_efficiency:.1f}%, " +
+                      f"Overall {new_score:.1f}/100")
+                
+                # Only reroute if the new route is significantly better
+                if new_score > current_score + 5:  # Require at least 5 point improvement
                     # Check if this would cause a U-turn
                     is_uturn = False
                     
@@ -1453,7 +1618,7 @@ class SimpleVisualizer(Node):
                                 print(f"Rejecting reroute: Would cause U-turn (angle diff: {angle_diff:.1f}°)")
                     
                     if not is_uturn:
-                        print(f"Found ghost-aware route with {len(new_route)} points (safety: {safety}/100)")
+                        print(f"Found better route! Overall score: {current_score:.1f} → {new_score:.1f}/100")
                         
                         # Replace route from current position onwards
                         smart_car.route = [current_pos] + new_route
@@ -1468,8 +1633,8 @@ class SimpleVisualizer(Node):
                         # It's a U-turn, so just slow down instead
                         smart_car.current_strategy = CollisionStrategy.SLOW_DOWN
                 else:
-                    print(f"Rejecting reroute: Safety too low ({safety}/100)")
-                    # Route is not safe enough, just slow down
+                    print(f"Rejecting reroute: Not significantly better ({new_score:.1f} ≤ {current_score + 5:.1f})")
+                    # Route is not better enough, just slow down
                     smart_car.current_strategy = CollisionStrategy.SLOW_DOWN
         
         return False
@@ -1558,14 +1723,15 @@ class SimpleVisualizer(Node):
     def check_route_for_conflicts(self):
         """
         Preventatively check entire route for potential conflicts with white cars
-        Like a flu shot, prevents problems before they occur
         Returns: 
             - bool: True if conflicts found, False if route is clear
             - int: Index of first conflicted waypoint
             - float: Safety score of the route (0-100)
+            - float: Efficiency score of the route (0-100)
+            - float: Combined route quality score (0-100)
         """
         if not self.route or not self.smart_car or len(self.route) <= self.current_target:
-            return False, -1, 100  # No conflicts possible
+            return False, -1, 100, 100, 100  # No conflicts possible
             
         # Get current position
         current_pos = (self.smart_car.x, self.smart_car.y)
@@ -1615,37 +1781,43 @@ class SimpleVisualizer(Node):
                     conflicts.append((i, waypoint, car, future_distance))
         
         # Calculate route safety score (100 = completely safe, 0 = very dangerous)
-        total_deduction = 0
-        for _, waypoint, car, distance in conflicts:
-            # Closer conflicts cause bigger deductions
-            safety_deduction = 30 * (self.ROAD_WIDTH * 3 - distance) / (self.ROAD_WIDTH * 3)
-            total_deduction += safety_deduction
+        safety_score = self.calculate_path_safety(self.route)
         
-        safety_score = max(0, 100 - total_deduction)
+        # Calculate route efficiency score
+        efficiency_score = self.calculate_path_efficiency(self.route)
         
-        # Return conflict status
+        # Calculate combined score (weighted balance of safety and efficiency)
+        combined_score = (safety_score * 0.6) + (efficiency_score * 0.4)
+        
+        # Return conflict status and scores
         if conflicts:
-            # Return index of first conflicted waypoint and safety score
+            # Return index of first conflicted waypoint and scores
             first_conflict = min(conflicts, key=lambda x: x[0])
-            return True, first_conflict[0] + self.current_target, safety_score
+            return True, first_conflict[0] + self.current_target, safety_score, efficiency_score, combined_score
         
-        return False, -1, safety_score
+        return False, -1, safety_score, efficiency_score, combined_score
     
     def preventative_reroute(self):
         """
         Proactively reroute to avoid white cars in the planned route
-        This is like a flu shot - prevents problems before they occur
+        Balances safety (avoiding cars) with efficiency (shorter paths)
         """
         # Check if route needs to be checked
-        has_conflicts, conflict_index, safety_score = self.check_route_for_conflicts()
+        has_conflicts, conflict_index, safety_score, efficiency_score, combined_score = self.check_route_for_conflicts()
         
-        print(f"Route safety check: Score {safety_score:.1f}/100")
+        # Print detailed route metrics
+        print(f"Route metrics - Safety: {safety_score:.1f}/100, Efficiency: {efficiency_score:.1f}%, " +
+              f"Overall: {combined_score:.1f}/100")
         
-        # If route is safe enough, do nothing
-        if safety_score >= self.route_safety_threshold:
+        # Threshold for when to consider rerouting
+        # Now uses combined score rather than just safety
+        quality_threshold = self.route_safety_threshold
+        
+        # If route is good enough (based on combined score), do nothing
+        if combined_score >= quality_threshold:
             return False
             
-        # If we have conflicts, try to find a safer route
+        # If we have conflicts, try to find a better route
         if has_conflicts and conflict_index >= 0:
             print(f"Preventative rerouting: Conflict detected at waypoint {conflict_index}")
             
@@ -1676,11 +1848,16 @@ class SimpleVisualizer(Node):
             new_route = self.find_path_avoiding_ghosts(nearest_intersection, end_point, conflict_point)
             
             if new_route and len(new_route) > 1:
-                # Check safety of new route
+                # Calculate safety, efficiency and combined score for new route
                 new_safety = self.calculate_path_safety(new_route)
+                new_efficiency = self.calculate_path_efficiency(new_route, nearest_intersection, end_point)
+                new_combined = (new_safety * 0.6) + (new_efficiency * 0.4)
                 
-                # Only use new route if it's safer and doesn't cause a U-turn
-                if new_safety > safety_score:
+                print(f"New route metrics - Safety: {new_safety:.1f}/100, Efficiency: {new_efficiency:.1f}%, " +
+                      f"Overall: {new_combined:.1f}/100")
+                
+                # Only use new route if the combined score is better
+                if new_combined > combined_score + 5:  # Require at least 5 point improvement
                     # Check if this would cause a U-turn
                     is_uturn = False
                     
@@ -1701,7 +1878,7 @@ class SimpleVisualizer(Node):
                                 print(f"Rejecting preventative reroute: Would cause U-turn (angle diff: {angle_diff:.1f}°)")
                     
                     if not is_uturn:
-                        print(f"Preventative reroute: Found safer route (Score: {new_safety:.1f}/100)")
+                        print(f"Preventative reroute: Found better route (Overall: {combined_score:.1f} → {new_combined:.1f}/100)")
                         self.smart_car.route = [current_pos] + new_route
                         self.smart_car.current_target = 1
                         self.route = self.smart_car.route
@@ -1709,7 +1886,7 @@ class SimpleVisualizer(Node):
                         self.smart_car.current_strategy = CollisionStrategy.REROUTE
                         return True
                 else:
-                    print(f"Preventative reroute: New route not safer ({new_safety:.1f} ≤ {safety_score:.1f})")
+                    print(f"Preventative reroute: New route not better overall ({new_combined:.1f} ≤ {combined_score + 5:.1f})")
         
         return False
 
