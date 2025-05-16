@@ -406,6 +406,96 @@ class SimpleVisualizer(Node):
             
             # Store current target speed for smooth adjustment
             target_speed = self.smart_car.default_speed
+
+            # Check if we're approaching a turn and need to slow down
+            turn_slowdown_factor = 1.0  # Default: no slowdown
+            approaching_turn = False
+            completed_turn = False  # New flag for turn completion
+            
+            # Get current position and direction
+            current_pos = (self.smart_car.x, self.smart_car.y)
+            current_angle = self.smart_car.angle
+            current_dir_vector = (math.cos(math.radians(current_angle)), math.sin(math.radians(current_angle)))
+            
+            # Check if there's an upcoming turn
+            if self.current_target < len(self.route) - 1:
+                # Current target and next target to determine the upcoming turn
+                current_target_pt = self.route[self.current_target]
+                next_target_pt = self.route[self.current_target + 1]
+                
+                # Distance to current target (waypoint)
+                dx_to_waypoint = current_target_pt[0] - current_pos[0]
+                dy_to_waypoint = current_target_pt[1] - current_pos[1]
+                dist_to_waypoint = math.sqrt(dx_to_waypoint*dx_to_waypoint + dy_to_waypoint*dy_to_waypoint)
+                
+                # Increase turn awareness distance for earlier slowdown
+                turn_awareness_distance = self.ROAD_WIDTH * 6  # Increased from 4 to 6
+                
+                if dist_to_waypoint < turn_awareness_distance:
+                    # Calculate direction vectors for current segment and next segment
+                    current_segment_dx = current_target_pt[0] - current_pos[0]
+                    current_segment_dy = current_target_pt[1] - current_pos[1]
+                    
+                    next_segment_dx = next_target_pt[0] - current_target_pt[0]
+                    next_segment_dy = next_target_pt[1] - current_target_pt[1]
+                    
+                    # Normalize the vectors (make them unit vectors)
+                    current_segment_len = math.sqrt(current_segment_dx*current_segment_dx + current_segment_dy*current_segment_dy)
+                    next_segment_len = math.sqrt(next_segment_dx*next_segment_dx + next_segment_dy*next_segment_dy)
+                    
+                    if current_segment_len > 0 and next_segment_len > 0:
+                        current_segment_dx /= current_segment_len
+                        current_segment_dy /= current_segment_len
+                        
+                        next_segment_dx /= next_segment_len
+                        next_segment_dy /= next_segment_len
+                        
+                        # Calculate the dot product to find the angle between segments
+                        dot_product = current_segment_dx*next_segment_dx + current_segment_dy*next_segment_dy
+                        dot_product = max(-1.0, min(1.0, dot_product))  # Clamp to [-1, 1]
+                        
+                        # Calculate the angle between the segments in degrees
+                        angle_between_segments = math.degrees(math.acos(dot_product))
+                        
+                        # If there's a significant turn ahead, slow down based on turn sharpness
+                        if angle_between_segments > 20:  # Only consider as turn if angle > 20 degrees
+                            approaching_turn = True
+                            
+                            # Calculate slowdown factor - sharper turns require slower speeds
+                            # Linear interpolation: 0 degrees = 1.0 (no slowdown), 90+ degrees = 0.25 (75% slowdown)
+                            max_slowdown = 0.25  # Increased slowdown for sharp turns (was 0.3)
+                            turn_slowdown_factor = 1.0 - ((angle_between_segments / 90.0) * (1.0 - max_slowdown))
+                            turn_slowdown_factor = max(max_slowdown, turn_slowdown_factor)
+                            
+                            # Adjust slowdown based on distance to turn (more gradual slowdown)
+                            # Use quadratic interpolation for smoother deceleration
+                            distance_factor = (dist_to_waypoint / turn_awareness_distance)
+                            distance_factor = distance_factor * distance_factor  # Square for more gradual initial slowdown
+                            
+                            # Gradually apply the slowdown as we approach the turn
+                            effective_slowdown = 1.0 - (1.0 - turn_slowdown_factor) * (1.0 - distance_factor)
+                            turn_slowdown_factor = max(turn_slowdown_factor, effective_slowdown)
+                            
+                            # Additional slowdown for very sharp turns
+                            if angle_between_segments > 60:
+                                turn_slowdown_factor *= 0.8  # Extra 20% reduction for sharp turns
+                    else:
+                        # Check if we've completed a turn and can speed up
+                        # Calculate angle to next target
+                        if self.current_target < len(self.route):
+                            target = self.route[self.current_target]
+                            dx_to_target = target[0] - current_pos[0]
+                            dy_to_target = target[1] - current_pos[1]
+                            target_angle = math.degrees(math.atan2(dy_to_target, dx_to_target))
+                            
+                            # If we're aligned with the target (within 15 degrees)
+                            angle_diff = abs((target_angle - current_angle + 180) % 360 - 180)
+                            if angle_diff < 15:
+                                completed_turn = True
+                                # Allow faster acceleration after completing turn
+                                self.acceleration_rate = 0.08  # Temporarily increase acceleration
+                            else:
+                                self.acceleration_rate = 0.05  # Reset to normal acceleration
             
             # Adjust target speed based on collision status
             if self.smart_car.collision_risk:
@@ -423,6 +513,18 @@ class SimpleVisualizer(Node):
                     else:
                         # Even with no specific predicted collision, slow down just due to proximity
                         target_speed = self.smart_car.default_speed * 0.6  # 60% of normal speed
+            
+            # Apply turn slowdown if necessary and it results in a lower speed than other factors
+            if approaching_turn:
+                turn_target_speed = self.smart_car.default_speed * turn_slowdown_factor
+                target_speed = min(target_speed, turn_target_speed)
+            elif completed_turn:
+                # After completing turn, gradually return to normal speed
+                target_speed = max(target_speed, self.smart_car.default_speed * 0.8)  # Allow at least 80% speed
+                
+                # Add visual debug information if needed
+                if hasattr(self, 'show_hitboxes') and self.show_hitboxes:
+                    print(f"Completed turn: Speed = {target_speed:.1f}/{self.smart_car.default_speed:.1f}")
             
             # Smoothly adjust the actual speed toward the target speed
             if self.smart_car.speed < target_speed:
@@ -549,7 +651,7 @@ class SimpleVisualizer(Node):
                     safety_corners = self.get_car_corners(car.x, car.y, car.angle, safety_margin=self.safety_zone_size)
                     pygame.draw.lines(self.screen, (255, 100, 0), True, safety_corners, 1)
         
-        # Draw main car (purple) - now with Pacman-like features
+        # Draw main car (purple) - now with Pacman-like features and turn indicator
         if self.smart_car is not None:
             collision_color = self.PURPLE
             
@@ -584,7 +686,21 @@ class SimpleVisualizer(Node):
                         font = pygame.font.SysFont('Arial', 14)
                         text = font.render("REROUTE", True, self.WHITE)
                         self.screen.blit(text, (indicator_x - 25, indicator_y - 7))
-                        
+            
+            # Check if we're slowing down for a turn
+            if self.current_target < len(self.route) - 1 and self.smart_car.speed < self.smart_car.default_speed * 0.9:
+                # Display turn indicator only if we're significantly slowing down
+                indicator_x = self.smart_car.x
+                indicator_y = self.smart_car.y - 40  # Above car
+                
+                # If no other indicator is showing
+                if not hasattr(self.smart_car, 'collision_risk') or not self.smart_car.collision_risk:
+                    # Draw orange turn indicator
+                    pygame.draw.circle(self.screen, (255, 140, 0), (int(indicator_x), int(indicator_y)), 15)
+                    font = pygame.font.SysFont('Arial', 14)
+                    text = font.render("TURN", True, self.BLACK)
+                    self.screen.blit(text, (indicator_x - 15, indicator_y - 7))
+            
             self.draw_car(self.smart_car.x, self.smart_car.y, self.smart_car.angle, collision_color)
             
             # Draw hitbox for debugging
@@ -602,6 +718,43 @@ class SimpleVisualizer(Node):
                 detection_surface = pygame.Surface((self.detection_range*2, self.detection_range*2), pygame.SRCALPHA)
                 pygame.draw.circle(detection_surface, (0, 0, 255, 20), (self.detection_range, self.detection_range), self.detection_range)
                 self.screen.blit(detection_surface, (self.smart_car.x - self.detection_range, self.smart_car.y - self.detection_range))
+                
+                # If we're approaching a turn, visualize the turn angle with an arc
+                if self.current_target < len(self.route) - 1:
+                    current_target_pt = self.route[self.current_target]
+                    next_target_pt = self.route[self.current_target + 1]
+                    
+                    # Draw a line to show next segment
+                    pygame.draw.line(self.screen, (100, 255, 100), current_target_pt, next_target_pt, 3)
+                    
+                    # Calculate vectors and angle
+                    dx1 = current_target_pt[0] - self.smart_car.x
+                    dy1 = current_target_pt[1] - self.smart_car.y
+                    dx2 = next_target_pt[0] - current_target_pt[0]
+                    dy2 = next_target_pt[1] - current_target_pt[1]
+                    
+                    if dx1 != 0 or dy1 != 0 and dx2 != 0 or dy2 != 0:
+                        # Normalize vectors
+                        len1 = math.sqrt(dx1*dx1 + dy1*dy1)
+                        len2 = math.sqrt(dx2*dx2 + dy2*dy2)
+                        
+                        if len1 > 0 and len2 > 0:
+                            nx1, ny1 = dx1/len1, dy1/len1
+                            nx2, ny2 = dx2/len2, dy2/len2
+                            
+                            # Calculate dot product
+                            dot = nx1*nx2 + ny1*ny2
+                            dot = max(-1.0, min(1.0, dot))  # Clamp to avoid domain errors
+                            
+                            # Calculate angle in degrees
+                            angle = math.degrees(math.acos(dot))
+                            
+                            # Draw angle text near the turn
+                            if angle > 20:  # Only show significant turns
+                                font = pygame.font.SysFont('Arial', 16)
+                                angle_text = f"{angle:.1f}°"
+                                text_surface = font.render(angle_text, True, (255, 100, 0))
+                                self.screen.blit(text_surface, (current_target_pt[0] + 10, current_target_pt[1] + 10))
         
         # Draw grid size dropdown menu
         grid_dropdown_rect = pygame.Rect(
