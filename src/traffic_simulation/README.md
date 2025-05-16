@@ -106,14 +106,21 @@ source ~/ros2_ws/install/setup.bash
 
 ### Running
 
-Launch the refactored visualizer:
+Launch the GUI:
 ```bash
-ros2 run traffic_simulation refactored_visualizer
+ros2 run traffic_simulation gui
 ```
 
-Or use the simple visualizer:
+Or use one of the visualizers:
 ```bash
+# Original visualizer
 ros2 run traffic_simulation simple_visualizer
+
+# Updated visualizer with components
+ros2 run traffic_simulation simple_visualizer_updated
+
+# Fully refactored visualizer
+ros2 run traffic_simulation refactored_visualizer
 ```
 
 To run the collision avoidance node separately:
@@ -133,10 +140,10 @@ ros2 run traffic_simulation collision_avoidance_node
 - Press +/- to adjust simulation speed
 - Press ESC to exit
 
-## License
+## Project Information
 
-Apache License 2.0
-
-## Contributors
-
-- Traffic Simulation Team 
+- **Version**: 0.1.0
+- **Description**: Bitirme Projesi
+- **Maintainer**: Mehmet Emin Çakın
+- **Email**: mehmetemincakin@gmail.com
+- **License**: Apache License 2.0 

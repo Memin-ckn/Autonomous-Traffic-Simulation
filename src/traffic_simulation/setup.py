@@ -29,10 +29,9 @@ setup(
     ],
     install_requires=['setuptools', 'pygame'],
     zip_safe=True,
-    maintainer='Traffic Simulation Team',
-    maintainer_email='team@trafficsim.org',
-    description='ROS2 traffic simulation with component-based architecture',
-    license='Apache License 2.0',
+    maintainer='Mehmet Emin Çakın',
+    maintainer_email='mehmetemincakin@gmail.com',
+    description='Bitirme Projesi',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [

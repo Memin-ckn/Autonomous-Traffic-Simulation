@@ -3,8 +3,8 @@
 <package format="3">
   <name>traffic_simulation</name>
   <version>0.1.0</version>
-  <description>ROS2 traffic simulation with component-based architecture</description>
-  <maintainer email="team@trafficsim.org">Traffic Simulation Team</maintainer>
+  <description>Bitirme Projesi</description>
+  <maintainer email="mehmetemincakin@gmail.com">Mehmet Emin Çakın</maintainer>
   <license>Apache License 2.0</license>
 
   <depend>rclpy</depend>
