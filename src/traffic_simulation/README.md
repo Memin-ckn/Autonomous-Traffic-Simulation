@@ -4,17 +4,19 @@ A ROS2-based traffic simulation system with a component-based architecture, usin
 
 ## Overview
 
-This project implements a traffic simulation system where vehicles navigate through a road network while avoiding collisions. The simulation includes various vehicle types with different behaviors, sensors, and collision avoidance strategies.
+This project implements a traffic simulation system where all vehicles are fully autonomous. Every car (white or purple) navigates through a road network using sensors, IoT communication, and advanced collision avoidance strategies with predictive ghost-like behavior.
 
 ## Features
 
 - Procedurally generated road networks with intersections
-- Multiple vehicle types with different behaviors
-- Sensor simulation (Lidar, Radar)
-- IoT communication between vehicles
-- Collision detection and avoidance
-- Path planning and route optimization
+- All vehicles are fully autonomous with sensors and IoT
+- Sensor simulation (Lidar, Radar) for every vehicle
+- IoT communication between all vehicles
+- Advanced collision detection and avoidance with predictive "ghost" behavior
+- Intelligent path planning and route optimization
 - Real-time visualization using Pygame
+- Dynamic safety and efficiency scoring system
+- Automatic route replanning for collision avoidance
 
 ## Project Structure
 
@@ -36,21 +38,15 @@ traffic_simulation/
 │   ├── vehicles/       # Vehicle classes and behaviors
 │   ├── visualization/  # Visualization components
 │   │   ├── components/ # Modular visualization components
-│   │   ├── gui.py      # Main GUI
-│   │   ├── vehicle_visualization.py  # Vehicle rendering
-│   │   ├── simple_visualizer.py       # Original visualizer
-│   │   ├── simple_visualizer_updated.py # Updated version
-│   │   └── refactored_visualizer.py   # Fully refactored version
+│   │   ├── traffic_visualizer.py  # Main visualization system
+│   │   └── vehicle_visualization.py  # Vehicle rendering
 ```
 
 ## Components
 
 ### Visualization
 
-- `renderer.py`: Handles all drawing operations
-- `world_model.py`: Manages the road network and pathfinding
-- `collision_detector.py`: Handles collision detection and prediction
-- `ui_manager.py`: Manages user interface elements
+- `traffic_visualizer.py`: Main visualization system with real-time display and interaction
 - `vehicle_visualization.py`: Handles vehicle rendering and display
 
 ### Control
@@ -60,14 +56,13 @@ traffic_simulation/
 ### Vehicles
 
 - `vehicle.py`: Base vehicle class and implementations for various vehicle types
-- `WhiteCar`: Standard vehicle with basic routing
-- `SmartCar`: Advanced vehicle with collision avoidance
+- `WhiteCar`: Fully autonomous, sensor-equipped, IoT-enabled vehicle (visually white)
+- `SmartCar`: Fully autonomous, sensor-equipped, IoT-enabled vehicle (visually purple)
 
 ### Planning
 
 - `collision_avoidance.py`: Planning-based collision avoidance strategies
 - `path_planner.py`: Plans optimal paths through the network
-- `route_planner.py`: High-level route planning
 
 ### Sensors
 
@@ -81,27 +76,27 @@ traffic_simulation/
 
 ### Prerequisites
 
-- ROS2 Jazzy Jalisco
+- ROS2 Humble Hawksbill or newer
 - Python 3.x
 - Pygame
 
 ### Installation
 
-1. Clone the repository to your ROS2 workspace:
+1. Clone the repository to your workspace:
 ```bash
-cd ~/ros2_ws/src
+cd ~/traffic_sim_ws/src
 git clone https://github.com/Memin-ckn/Autonomous-Traffic-Simulation.git
 ```
 
 2. Build the package:
 ```bash
-cd ~/ros2_ws
+cd ~/traffic_sim_ws
 colcon build --packages-select traffic_simulation
 ```
 
 3. Source the setup file:
 ```bash
-source ~/ros2_ws/install/setup.bash
+source ~/traffic_sim_ws/install/setup.bash
 ```
 
 ### Running
@@ -118,23 +113,11 @@ This command will:
 3. Source the setup file
 4. Launch the simulation using the launch file
 
-Alternatively, you can run individual components:
+You can also run individual components:
 
-Launch the GUI:
+Launch the visualization:
 ```bash
-ros2 run traffic_simulation gui
-```
-
-Or use one of the visualizers:
-```bash
-# Original visualizer
-ros2 run traffic_simulation simple_visualizer
-
-# Updated visualizer with components
-ros2 run traffic_simulation simple_visualizer_updated
-
-# Fully refactored visualizer
-ros2 run traffic_simulation refactored_visualizer
+ros2 run traffic_simulation traffic_visualizer
 ```
 
 To run the collision avoidance node separately:
@@ -144,20 +127,29 @@ ros2 run traffic_simulation collision_avoidance_node
 
 ## Usage
 
+### Basic Controls
 - Click on intersections to set start and end points
 - Press 'S' to randomly select start and end points
-- Press 'H' to toggle hitboxes for collision detection
+- Press 'A' to toggle auto-restart mode (automatically generates new routes)
+- Press 'H' to toggle hitboxes and safety zones
 - Press 'R' to force the main car to find an alternative route
-- Press 'P' to check the route and preventatively reroute
-- Use dropdowns to change grid size and car count
 - Press SPACE to pause/resume simulation
 - Press +/- to adjust simulation speed
 - Press ESC to exit
 
+### Advanced Features
+- Use dropdowns to change grid size and car count
+- Watch the safety score, efficiency score, and overall route quality in real-time
+- Observe collision avoidance strategies:
+  - Slowing down (orange indicator)
+  - Yielding (red indicator)
+  - Rerouting (blue indicator)
+- Monitor turn indicators and safety zones when hitboxes are enabled
+
 ## Project Information
 
-- **Version**: 0.1.0
-- **Description**: Bitirme Projesi
+- **Version**: 0.2.0
+- **Description**: Advanced Autonomous Traffic Simulation System
 - **Maintainer**: Mehmet Emin Çakın
 - **Email**: mehmetemincakin@gmail.com
 - **License**: Apache License 2.0 

@@ -5,8 +5,8 @@ def generate_launch_description():
     return LaunchDescription([
         Node(
             package='traffic_simulation',
-            executable='simple_visualizer',
-            name='simple_visualizer',
+            executable='traffic_visualizer',
+            name='traffic_visualizer',
             output='screen'
         )
     ])

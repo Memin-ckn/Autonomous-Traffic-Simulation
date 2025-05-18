@@ -11,29 +11,29 @@ class RoutePlanner(Node):
     def __init__(self):
         super().__init__('route_planner')
         self.api_key = "YOUR_GOOGLE_MAPS_API_KEY"
-        self.origin = "37.7749,-122.4194"  #(San Francisco)
-        self.route_data = []  # saving road's
+        self.origin = "37.7749,-122.4194"  # San Francisco coordinates
+        self.route_data = []
         self.publisher_ = self.create_publisher(PoseStamped, 'goal', 10)
 
-        # get user target map
+        # Get destination from user and start planning
         self.destination = self.get_user_destination()
         if self.destination:
-            self.get_logger().info(f"Hedef adres: {self.destination}")
+            self.get_logger().info(f"Target address: {self.destination}")
             self.fetch_route()
         else:
-            self.get_logger().warning("Hedef belirlenmedi. Çıkılıyor.")
+            self.get_logger().warning("No destination set. Exiting.")
             rclpy.shutdown()
 
     def get_user_destination(self):
-        """ GUI."""
+        # Prompt user for destination via GUI
         root = Tk()
         root.withdraw()
-        destination = askstring("Hedef Belirleme", "Lütfen hedef adresini girin:")
+        destination = askstring("Set Destination", "Enter destination address:")
         root.destroy()
         return destination
 
     def fetch_route(self):
-        """Google Maps Directions API catching datas."""
+        # Get route data from Google Maps API
         directions_url = "https://maps.googleapis.com/maps/api/directions/json"
         params = {
             "origin": self.origin,
@@ -49,21 +49,21 @@ class RoutePlanner(Node):
                     start = step["start_location"]
                     end = step["end_location"]
                     self.route_data.append((start, end))
-                self.get_logger().info("Yol başarıyla alındı.")
+                self.get_logger().info("Route fetched successfully")
                 self.publish_route()
             else:
-                self.get_logger().error(f"Google Maps API hatası: {response['status']}")
+                self.get_logger().error(f"Google Maps API error: {response['status']}")
         except Exception as e:
-            self.get_logger().error(f"Rota alınırken hata oluştu: {e}")
+            self.get_logger().error(f"Error fetching route: {e}")
 
     def publish_route(self):
-        """publish on "goal" topic"""
+        # Publish waypoints to goal topic
         for idx, (start, end) in enumerate(self.route_data):
             goal_msg = PoseStamped()
             goal_msg.pose.position.x = end["lat"]
             goal_msg.pose.position.y = end["lng"]
             self.publisher_.publish(goal_msg)
-            self.get_logger().info(f"{idx + 1}. Hedef yayınlandı: {end['lat']}, {end['lng']}")
+            self.get_logger().info(f"Published goal {idx + 1}: {end['lat']}, {end['lng']}")
 
 
 def main(args=None):

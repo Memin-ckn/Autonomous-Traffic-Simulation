@@ -9,33 +9,32 @@ from rclpy.node import Node
 
 # Debug import issues
 try:
-    print("Importing vehicle classes...")
+    print("Initializing vehicle components...")
     from traffic_simulation.vehicles.vehicle import Vehicle, WhiteCar, SmartCar
-    print("Importing sensor classes...")
+    print("Initializing sensor components...")
     from traffic_simulation.sensors.sensor import Lidar, Radar
-    print("Importing communication classes...")
+    print("Initializing communication components...")
     from traffic_simulation.communication.iot import IoTCommunicator
-    print("Importing collision avoidance classes...")
+    print("Initializing collision avoidance components...")
     from traffic_simulation.planning.collision_avoidance import CollisionAvoidance, CollisionStrategy
-    print("All imports successful!")
+    print("All components initialized successfully!")
 except Exception as e:
-    print(f"Import error: {e}")
+    print(f"Initialization error: {e}")
     import traceback
     traceback.print_exc()
-    # Don't crash, but set flags to avoid using these features
     IMPORT_ERROR = True
 else:
     IMPORT_ERROR = False
 
-class SimpleVisualizer(Node):
+class TrafficVisualizer(Node):
     def __init__(self):
-        super().__init__('simple_visualizer')
+        super().__init__('traffic_visualizer')
         pygame.init()
         
         # Create a fullscreen window
         self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
         self.width, self.height = self.screen.get_size()
-        pygame.display.set_caption("Traffic Simulator")
+        pygame.display.set_caption("Traffic Simulation System")
         
         # Define colors
         self.GREEN = (34, 139, 34)  # Background
@@ -112,6 +111,12 @@ class SimpleVisualizer(Node):
         self.preventative_reroute_enabled = True  # Enable preventative rerouting
         self.route_safety_threshold = 50  # Minimum safety score to avoid rerouting
         self.route_check_count = 0  # Counter for checking route
+        
+        # Auto restart functionality
+        self.auto_restart_enabled = False
+        self.route_completed = False
+        self.restart_timer = 0  # Timer for delay before restart
+        self.restart_delay = 120  # 2 seconds (60 frames per second)
         
         # Generate the map
         self.intersections, self.roads = self.generate_grid()
@@ -353,7 +358,22 @@ class SimpleVisualizer(Node):
     
     def update_main_car(self):
         if self.smart_car is None or self.current_target >= len(self.route) or not self.route:
+            # Check if auto-restart is enabled and the car has reached its destination
+            if self.auto_restart_enabled and self.smart_car is not None and len(self.route) > 0 and self.current_target >= len(self.route):
+                if not self.route_completed:
+                    print("Auto-restart: Car reached destination, waiting 2 seconds before restart...")
+                    self.route_completed = True
+                    self.restart_timer = self.restart_delay  # Start the timer
+                elif self.restart_timer > 0:
+                    self.restart_timer -= 1  # Decrement timer
+                elif self.restart_timer == 0:
+                    print("Auto-restart: Generating new route...")
+                    self.random_start_finish()
             return
+        
+        # Reset the route completion flag and timer since we're still moving
+        self.route_completed = False
+        self.restart_timer = self.restart_delay
         
         try:
             # If the route changed, update the smart car's route
@@ -850,7 +870,7 @@ class SimpleVisualizer(Node):
             "Traffic Simulator - Simple Visualizer",
             "Click red intersection to set start, blue for end",
             "Press 'S' to randomly select start and end points",
-            "Press 'P' to check route and preventatively reroute",
+            "Press 'A' to toggle auto-restart mode",
             "Click dropdowns to change grid size and car count",
             "Press 'H' to toggle hitboxes for collision detection",
             "Press 'R' to force the purple car to find an alternative route",
@@ -858,9 +878,28 @@ class SimpleVisualizer(Node):
             "ESC to exit"
         ]
         
+        # Calculate starting Y position (below dropdowns)
+        dropdown_bottom = int(self.height * 0.05) + self.dropdown_height + 20
+        
+        # Fixed X position at 5 pixels from left edge
+        instructions_x = 5
+        
         for i, text in enumerate(instructions):
             text_surface = font.render(text, True, self.WHITE)
-            self.screen.blit(text_surface, (20, 20 + i * 20))
+            self.screen.blit(text_surface, (instructions_x, dropdown_bottom + i * 20))
+            
+        # Display auto-restart status
+        if self.auto_restart_enabled:
+            auto_font = pygame.font.SysFont('Arial', 18, bold=True)
+            auto_text = "Auto-Restart: ENABLED"
+            auto_surface = auto_font.render(auto_text, True, (0, 255, 0))
+            self.screen.blit(auto_surface, (self.width - auto_surface.get_width() - 20, 140))
+            
+            # Show countdown if route is completed and waiting to restart
+            if self.route_completed and self.restart_timer > 0:
+                countdown_text = f"Restarting in: {self.restart_timer // 60 + 1}s"
+                countdown_surface = auto_font.render(countdown_text, True, (255, 165, 0))
+                self.screen.blit(countdown_surface, (self.width - countdown_surface.get_width() - 20, 170))
             
         # Display collision avoidance status if active
         if self.smart_car and hasattr(self.smart_car, 'collision_risk') and self.smart_car.collision_risk:
@@ -1096,88 +1135,95 @@ class SimpleVisualizer(Node):
                     return
     
     def run(self):
-        running = True
-        frame_counter = 0
+        print("Initializing ROS2...")
+        print("Creating TrafficVisualizer node...")
         
-        try:
-            while running:
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
+        # Generate initial map
+        self.intersections, self.roads = self.generate_grid()
+        
+        print("Starting TrafficVisualizer main loop...")
+        running = True
+        while running:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
                         running = False
-                    elif event.type == pygame.KEYDOWN:
-                        if event.key == pygame.K_ESCAPE:
-                            running = False
-                        elif event.key == pygame.K_h:
-                            # Toggle hitbox display
-                            self.show_hitboxes = not self.show_hitboxes
-                            print(f"Hitboxes {'on' if self.show_hitboxes else 'off'} - showing {'ghost danger zones' if self.show_hitboxes else 'normal view'}")
-                        elif event.key == pygame.K_r:
-                            # Force purple car to reroute (for testing)
-                            if self.smart_car and self.route and len(self.route) > 1:
-                                print("Forcing ghost-aware reroute!")
-                                current_pos = (self.smart_car.x, self.smart_car.y)
-                                end_point = self.route[-1]
-                                
-                                # Find a random intersection to avoid
-                                if self.intersections and len(self.intersections) > 1:
-                                    # Choose the next node in the current route to avoid
-                                    if self.current_target < len(self.route):
-                                        avoid_point = self.route[self.current_target]
+                    elif event.key == pygame.K_h:
+                        # Toggle hitbox display
+                        self.show_hitboxes = not self.show_hitboxes
+                        print(f"Hitboxes {'on' if self.show_hitboxes else 'off'} - showing {'ghost danger zones' if self.show_hitboxes else 'normal view'}")
+                    elif event.key == pygame.K_r:
+                        # Force purple car to reroute (for testing)
+                        if self.smart_car and self.route and len(self.route) > 1:
+                            print("Forcing ghost-aware reroute!")
+                            current_pos = (self.smart_car.x, self.smart_car.y)
+                            end_point = self.route[-1]
+                            
+                            # Find a random intersection to avoid
+                            if self.intersections and len(self.intersections) > 1:
+                                # Choose the next node in the current route to avoid
+                                if self.current_target < len(self.route):
+                                    avoid_point = self.route[self.current_target]
+                                    
+                                    # Find nearest intersection to current position
+                                    start_intersection = self._find_nearest_intersection(current_pos)
+                                    
+                                    if start_intersection:
+                                        # Use ghost-aware pathfinding
+                                        new_route = self.find_path_avoiding_ghosts(
+                                            start_intersection, 
+                                            end_point, 
+                                            avoid_point
+                                        )
                                         
-                                        # Find nearest intersection to current position
-                                        start_intersection = self._find_nearest_intersection(current_pos)
-                                        
-                                        if start_intersection:
-                                            # Use ghost-aware pathfinding
-                                            new_route = self.find_path_avoiding_ghosts(
-                                                start_intersection, 
-                                                end_point, 
-                                                avoid_point
-                                            )
-                                            
-                                            if new_route and len(new_route) > 1:
-                                                safety = self.calculate_path_safety(new_route)
-                                                print(f"Rerouted with {len(new_route)} points, safety: {safety}/100")
-                                                self.smart_car.route = [current_pos] + new_route
-                                                self.smart_car.current_target = 1
-                                                self.route = self.smart_car.route
-                                                self.current_target = 1
-                                                # Set the strategy to REROUTE 
-                                                self.smart_car.current_strategy = CollisionStrategy.REROUTE
-                        elif event.key == pygame.K_p:
-                            # Force preventative reroute check (for testing)
-                            if self.smart_car and self.route and len(self.route) > 1:
-                                print("Checking route safety and rerouting if needed...")
-                                self.preventative_reroute()
-                        elif event.key == pygame.K_s:
-                            # Random start and finish with ghost-aware routing
-                            print("Generating random start and finish points with ghost avoidance...")
-                            self.random_start_finish()
-                    elif event.type == pygame.MOUSEBUTTONDOWN:
-                        self.handle_click(pygame.mouse.get_pos())
-                
-                # Update main car position
-                self.update_main_car()
-                
-                # Update white cars
-                for car in self.white_cars:
-                    car.update()
-                
-                # Periodically validate routes (every 60 frames)
-                frame_counter += 1
-                if frame_counter % 60 == 0:
-                    self.validate_routes()
-                
-                # Draw everything
-                self.draw_scene()
-                
-                # Update the display
-                pygame.display.flip()
-                self.clock.tick(60)
-        except Exception as e:
-            self.get_logger().error(f"Error in visualization: {e}")
-            import traceback
-            self.get_logger().error(traceback.format_exc())
+                                        if new_route and len(new_route) > 1:
+                                            safety = self.calculate_path_safety(new_route)
+                                            print(f"Rerouted with {len(new_route)} points, safety: {safety}/100")
+                                            self.smart_car.route = [current_pos] + new_route
+                                            self.smart_car.current_target = 1
+                                            self.route = self.smart_car.route
+                                            self.current_target = 1
+                                            # Set the strategy to REROUTE 
+                                            self.smart_car.current_strategy = CollisionStrategy.REROUTE
+                    elif event.key == pygame.K_a:
+                        # Toggle auto-restart mode
+                        self.auto_restart_enabled = not self.auto_restart_enabled
+                        print(f"Auto-restart mode {'enabled' if self.auto_restart_enabled else 'disabled'}")
+                        
+                        # Reset route completion flag
+                        self.route_completed = False
+                    elif event.key == pygame.K_s:
+                        # Random start and finish with ghost-aware routing
+                        print("Generating random start and finish points with ghost avoidance...")
+                        self.random_start_finish()
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    self.handle_click(pygame.mouse.get_pos())
+            
+            # Update main car position
+            self.update_main_car()
+            
+            # Update white cars
+            for car in self.white_cars:
+                car.update()
+            
+            # Periodically validate routes (every 60 frames)
+            frame_counter += 1
+            if frame_counter % 60 == 0:
+                self.validate_routes()
+            
+            # Draw everything
+            self.draw_scene()
+            
+            # Update the display
+            pygame.display.flip()
+            self.clock.tick(60)
+        
+        print("TrafficVisualizer main loop completed")
+        print("Performing cleanup...")
+        pygame.quit()
+        print("Cleanup complete")
 
     def has_road_between(self, point1, point2):
         """Check if there's a direct road between two points"""
@@ -2099,8 +2145,16 @@ class WhiteCar:
     
     def update(self):
         try:
+            # Get list of all vehicles from the visualizer
+            all_vehicles = []
+            if self.node and hasattr(self.node, 'white_cars'):
+                # Add all white cars except self
+                for car in self.node.white_cars:
+                    if car != self:
+                        all_vehicles.append(car.vehicle)
+            
             # Update the actual vehicle with the current list of cars
-            self.vehicle.update([])
+            self.vehicle.update(all_vehicles)
             
             # Update the local attributes for visualization
             self.x = self.vehicle.x
@@ -2178,13 +2232,13 @@ def main(args=None):
         print("Initializing ROS2...")
         rclpy.init(args=args)
         
-        print("Creating SimpleVisualizer node...")
-        node = SimpleVisualizer()
+        print("Creating TrafficVisualizer node...")
+        node = TrafficVisualizer()
         
-        print("Starting SimpleVisualizer run loop...")
+        print("Starting TrafficVisualizer main loop...")
         node.run()
         
-        print("SimpleVisualizer run completed normally")
+        print("TrafficVisualizer main loop completed normally")
     
     except KeyboardInterrupt:
         print("Keyboard interrupt received, shutting down")

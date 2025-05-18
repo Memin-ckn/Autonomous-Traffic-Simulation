@@ -8,42 +8,40 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 
 @dataclass
 class SensorReading:
-    """Data class to hold sensor readings"""
-    distance: float
-    angle: float
-    object_id: Optional[str] = None  # ID of detected object
-    velocity: Optional[Tuple[float, float]] = None  # Optional velocity vector of detected object
-    timestamp: float = 0.0  # When reading was taken
+    # Common data structure for all sensor readings
+    distance: float      # Distance to detected object
+    angle: float        # Angle relative to sensor heading
+    object_id: Optional[str] = None  # Unique identifier of detected object
+    velocity: Optional[Tuple[float, float]] = None  # Velocity vector (vx, vy)
+    timestamp: float = 0.0  # Time of reading
 
 
 class Sensor:
-    """Base class for all sensors"""
+    # Base sensor class defining common interface
     def __init__(self, parent_id: str, range_max: float = 100.0, angle_range: float = 180.0, 
                  angle_increment: float = 1.0, node=None):
         self.parent_id = parent_id
         self.range_max = range_max
-        self.angle_range = angle_range  # in degrees
-        self.angle_increment = angle_increment  # in degrees
+        self.angle_range = angle_range  # Field of view in degrees
+        self.angle_increment = angle_increment  # Angular resolution
         self.node = node
         self.readings = []
         
     def detect_objects(self, objects: List, position: Tuple[float, float], 
                       heading: float) -> List[SensorReading]:
-        """Detect objects within sensor range"""
         pass
     
     def publish_readings(self):
-        """Publish sensor readings to ROS2 topics"""
         pass
 
 
 class Lidar(Sensor):
-    """Lidar sensor with 360 degree view"""
+    # LIDAR implementation with high-resolution 360° scanning
     def __init__(self, parent_id: str, range_max: float = 150.0, 
                  angle_range: float = 360.0, angle_increment: float = 1.0, node=None):
         super().__init__(parent_id, range_max, angle_range, angle_increment, node)
         
-        # Create ROS2 publisher if node is available
+        # Setup ROS2 publisher with best-effort QoS for high-frequency data
         if self.node:
             qos = QoSProfile(
                 reliability=ReliabilityPolicy.BEST_EFFORT,
@@ -58,72 +56,52 @@ class Lidar(Sensor):
         
     def detect_objects(self, objects: List, position: Tuple[float, float], 
                       heading: float) -> List[SensorReading]:
-        """
-        Detect objects within the lidar range
-        position: (x, y) of the sensor
-        heading: Orientation in degrees
-        """
-        # Clear previous readings
+        # Perform 360° scan and detect objects
         self.readings = []
         
-        # Calculate angles to check (relative to vehicle heading)
+        # Generate scan angles
         start_angle = heading - self.angle_range / 2
         angles = [start_angle + i * self.angle_increment 
                   for i in range(int(self.angle_range / self.angle_increment) + 1)]
         
-        # For each angle, find closest object
+        # Ray-cast at each angle
         for angle in angles:
-            # Convert to radians
             rad_angle = math.radians(angle)
-            
-            # Calculate ray end point at maximum range
-            ray_end_x = position[0] + self.range_max * math.cos(rad_angle)
-            ray_end_y = position[1] + self.range_max * math.sin(rad_angle)
-            
             closest_dist = self.range_max
             closest_obj = None
             
-            # Check all objects
+            # Find closest object at current angle
             for obj in objects:
-                # Skip self
                 if hasattr(obj, 'id') and obj.id == self.parent_id:
                     continue
                 
-                # Simple circle-line intersection for detection
-                # This is a simplification - in a real system we would use proper collision detection
                 if hasattr(obj, 'x') and hasattr(obj, 'y'):
                     obj_x, obj_y = obj.x, obj.y
-                    
-                    # Calculate distance to object center
                     dx = obj_x - position[0]
                     dy = obj_y - position[1]
                     center_dist = math.sqrt(dx*dx + dy*dy)
                     
-                    # If within range
                     if center_dist < self.range_max:
-                        # Calculate angle to object
                         obj_angle = math.degrees(math.atan2(dy, dx))
                         angle_diff = abs((obj_angle - angle + 180) % 360 - 180)
                         
-                        # If within beam width (10 degrees)
-                        if angle_diff < 5:
-                            # Check if this is the closest object
-                            if center_dist < closest_dist:
-                                closest_dist = center_dist
-                                closest_obj = obj
+                        # Object within 5° beam width
+                        if angle_diff < 5 and center_dist < closest_dist:
+                            closest_dist = center_dist
+                            closest_obj = obj
             
-            # Add reading
+            # Record detection
             if closest_obj is not None:
                 reading = SensorReading(
                     distance=closest_dist,
-                    angle=angle - heading,  # Relative to vehicle heading
+                    angle=angle - heading,
                     object_id=getattr(closest_obj, 'id', None),
                     velocity=(getattr(closest_obj, 'vx', 0), getattr(closest_obj, 'vy', 0)),
                     timestamp=self.node.get_clock().now().nanoseconds / 1e9 if self.node else 0.0
                 )
                 self.readings.append(reading)
             else:
-                # No object detected at this angle
+                # No detection at this angle
                 reading = SensorReading(
                     distance=self.range_max,
                     angle=angle - heading,
@@ -134,16 +112,14 @@ class Lidar(Sensor):
         return self.readings
     
     def publish_readings(self):
-        """Publish lidar readings to ROS2 topic"""
+        # Publish scan data as ROS2 LaserScan message
         if not self.node or not hasattr(self, 'publisher'):
             return
             
-        # Create LaserScan message
         msg = LaserScan()
         msg.header.stamp = self.node.get_clock().now().to_msg()
         msg.header.frame_id = f"{self.parent_id}_lidar"
         
-        # Set scan parameters
         msg.angle_min = math.radians(-self.angle_range / 2)
         msg.angle_max = math.radians(self.angle_range / 2)
         msg.angle_increment = math.radians(self.angle_increment)
@@ -152,24 +128,17 @@ class Lidar(Sensor):
         msg.range_min = 0.1
         msg.range_max = self.range_max
         
-        # Set ranges from readings
-        ranges = []
-        for reading in self.readings:
-            ranges.append(reading.distance)
-        
-        msg.ranges = ranges
-        
-        # Publish
+        msg.ranges = [reading.distance for reading in self.readings]
         self.publisher.publish(msg)
 
 
 class Radar(Sensor):
-    """Radar sensor with velocity detection capabilities"""
+    # Radar implementation with wider beams and velocity detection
     def __init__(self, parent_id: str, range_max: float = 200.0, 
                  angle_range: float = 120.0, angle_increment: float = 5.0, node=None):
         super().__init__(parent_id, range_max, angle_range, angle_increment, node)
         
-        # Create ROS2 publisher if node is available
+        # Setup ROS2 publisher for radar data
         if self.node:
             qos = QoSProfile(
                 reliability=ReliabilityPolicy.BEST_EFFORT,
@@ -184,69 +153,47 @@ class Radar(Sensor):
     
     def detect_objects(self, objects: List, position: Tuple[float, float], 
                       heading: float) -> List[SensorReading]:
-        """
-        Detect objects within radar range with velocity information
-        position: (x, y) of the sensor
-        heading: Orientation in degrees
-        """
-        # Similar to Lidar but with fewer beams and velocity calculation
-        # Clear previous readings
+        # Detect objects with velocity information
         self.readings = []
         
-        # Calculate angles to check (relative to vehicle heading)
+        # Generate scan angles (wider spacing than LIDAR)
         start_angle = heading - self.angle_range / 2
         angles = [start_angle + i * self.angle_increment 
                   for i in range(int(self.angle_range / self.angle_increment) + 1)]
         
-        # For each angle, find objects
+        # Ray-cast with wider beams
         for angle in angles:
-            # Convert to radians
             rad_angle = math.radians(angle)
-            
-            # Calculate ray end point at maximum range
-            ray_end_x = position[0] + self.range_max * math.cos(rad_angle)
-            ray_end_y = position[1] + self.range_max * math.sin(rad_angle)
-            
             closest_dist = self.range_max
             closest_obj = None
             
-            # Check all objects
             for obj in objects:
-                # Skip self
                 if hasattr(obj, 'id') and obj.id == self.parent_id:
                     continue
                 
-                # Simple circle-line intersection for detection
                 if hasattr(obj, 'x') and hasattr(obj, 'y'):
                     obj_x, obj_y = obj.x, obj.y
-                    
-                    # Calculate distance to object center
                     dx = obj_x - position[0]
                     dy = obj_y - position[1]
                     center_dist = math.sqrt(dx*dx + dy*dy)
                     
-                    # If within range
                     if center_dist < self.range_max:
-                        # Calculate angle to object
                         obj_angle = math.degrees(math.atan2(dy, dx))
                         angle_diff = abs((obj_angle - angle + 180) % 360 - 180)
                         
-                        # If within beam width (wider for radar)
-                        if angle_diff < 10:
-                            # Check if this is the closest object
-                            if center_dist < closest_dist:
-                                closest_dist = center_dist
-                                closest_obj = obj
+                        # Object within 10° beam width (wider than LIDAR)
+                        if angle_diff < 10 and center_dist < closest_dist:
+                            closest_dist = center_dist
+                            closest_obj = obj
             
-            # Add reading
+            # Record detection with velocity
             if closest_obj is not None:
-                # Calculate relative velocity (if available)
                 vx = getattr(closest_obj, 'vx', 0)
                 vy = getattr(closest_obj, 'vy', 0)
                 
                 reading = SensorReading(
                     distance=closest_dist,
-                    angle=angle - heading,  # Relative to vehicle heading
+                    angle=angle - heading,
                     object_id=getattr(closest_obj, 'id', None),
                     velocity=(vx, vy),
                     timestamp=self.node.get_clock().now().nanoseconds / 1e9 if self.node else 0.0
@@ -256,14 +203,12 @@ class Radar(Sensor):
         return self.readings
     
     def publish_readings(self):
-        """Publish radar readings to ROS2 topic"""
+        # Publish closest detection as ROS2 Range message
         if not self.node or not hasattr(self, 'publisher') or not self.readings:
             return
             
-        # Find closest object for Range message
         closest_reading = min(self.readings, key=lambda r: r.distance)
         
-        # Create Range message
         msg = Range()
         msg.header.stamp = self.node.get_clock().now().to_msg()
         msg.header.frame_id = f"{self.parent_id}_radar"
@@ -273,5 +218,4 @@ class Radar(Sensor):
         msg.max_range = self.range_max
         msg.range = closest_reading.distance
         
-        # Publish
         self.publisher.publish(msg) 
